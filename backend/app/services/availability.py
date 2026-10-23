@@ -1,0 +1,72 @@
+"""Stay validation, inventory and pricing. All amounts are integer paise and
+come from the database - never from the client."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
+
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.core.errors import AppError
+from app.core.timeutil import hotel_today
+from app.models import RoomType
+from app.repositories import bookings as booking_repo
+
+
+@dataclass(frozen=True)
+class Quote:
+    nights: int
+    nightly_rate_paise: int
+    subtotal_paise: int
+    tax_percent: Decimal
+    tax_paise: int
+    total_paise: int
+
+
+def validate_stay(check_in: date, check_out: date) -> int:
+    s = get_settings()
+    today = hotel_today()
+    if check_in < today:
+        raise AppError("Check-in cannot be in the past.", code="invalid_dates",
+                       details=[{"field": "check_in", "message": "Choose today or a later date"}])
+    if check_out <= check_in:
+        raise AppError("Check-out must be after check-in.", code="invalid_dates",
+                       details=[{"field": "check_out", "message": "Choose a date after check-in"}])
+    nights = (check_out - check_in).days
+    if nights > s.max_stay_nights:
+        raise AppError(f"Online bookings are limited to {s.max_stay_nights} nights. Please contact us for longer stays.",
+                       code="stay_too_long", details=[{"field": "check_out", "message": "Stay is too long"}])
+    if check_in > today + timedelta(days=s.max_advance_days):
+        raise AppError(f"Bookings open {s.max_advance_days} days in advance.", code="too_far_ahead",
+                       details=[{"field": "check_in", "message": "Date is too far ahead"}])
+    return nights
+
+
+def fits_party(room: RoomType, adults: int, children: int) -> bool:
+    return adults <= room.max_adults and children <= room.max_children
+
+
+def peak_occupancy(stays: list[tuple[date, date]], check_in: date, check_out: date) -> int:
+    """Highest number of rooms taken on any single night of the stay."""
+    peak = 0
+    night = check_in
+    while night < check_out:
+        taken = sum(1 for s_in, s_out in stays if s_in <= night < s_out)
+        peak = max(peak, taken)
+        night += timedelta(days=1)
+    return peak
+
+
+def available_rooms(db: Session, room: RoomType, check_in: date, check_out: date, now: datetime,
+                    exclude_booking_id: int | None = None) -> int:
+    stays = booking_repo.overlapping_stays(db, room.id, check_in, check_out, now, exclude_booking_id)
+    return max(0, room.total_rooms - peak_occupancy(stays, check_in, check_out))
+
+
+def quote(room: RoomType, nights: int, tax_percent: Decimal) -> Quote:
+    subtotal = room.base_rate_paise * nights
+    tax = int((Decimal(subtotal) * tax_percent / Decimal(100)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return Quote(nights=nights, nightly_rate_paise=room.base_rate_paise, subtotal_paise=subtotal,
+                 tax_percent=tax_percent, tax_paise=tax, total_paise=subtotal + tax)

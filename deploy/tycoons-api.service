@@ -1,0 +1,16 @@
+# /etc/systemd/system/tycoons-api.service  (example)
+[Unit]
+Description=The Tycoons Hotel API (FastAPI / uvicorn)
+After=network.target mysql.service
+
+[Service]
+User=tycoons
+WorkingDirectory=/srv/tycoons/backend
+EnvironmentFile=/srv/tycoons/backend/.env
+# One worker: the rate limiter is in-process (see README > Production notes).
+ExecStart=/srv/tycoons/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

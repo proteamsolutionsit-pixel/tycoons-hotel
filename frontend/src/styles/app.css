@@ -1,0 +1,136 @@
+/* ==========================================================================
+   Additions for behaviour the static design did not have: form feedback,
+   loading/empty states, the booking & payment flow and the map embed.
+   Built only from the tokens in site.css so it reads as the same site.
+   ========================================================================== */
+:root {
+  --c-error: #9B2C2C;    /* 7.4:1 on --c-bg */
+  --c-success: #2F5D3A;  /* 7.6:1 on --c-bg */
+}
+
+/* Field-level validation ------------------------------------------------ */
+.field-error {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.4;
+  color: var(--c-error);
+}
+.field input[aria-invalid="true"],
+.field select[aria-invalid="true"],
+.field textarea[aria-invalid="true"],
+.input[aria-invalid="true"] { border-color: var(--c-error); box-shadow: inset 0 0 0 1px var(--c-error); }
+.check + .field-error, .newsletter__form .field-error { margin-top: calc(var(--s-2) * -1); }
+.form-panel .field-error--check { grid-column: 1 / -1; margin-top: calc(var(--s-4) * -1); }
+
+/* Form result banner ------------------------------------------------------ */
+.form-status {
+  grid-column: 1 / -1;
+  padding: var(--s-4) var(--s-5);
+  border-left: 2px solid currentColor;
+  background: var(--c-bg);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--c-text);
+}
+.form-status--success { border-left-color: var(--c-success); }
+.form-status--error { border-left-color: var(--c-error); }
+.form-status strong { font-weight: 500; }
+.on-brand .form-status { background: rgb(255 255 255 / 0.06); color: var(--c-on-brand); }
+
+.btn[disabled] { cursor: progress; opacity: 0.72; }
+.btn[disabled]:hover::before { transform: scaleY(0); }
+.btn[disabled]:hover { color: var(--btn-fg); border-color: var(--btn-bg); }
+
+/* Loading / empty / error states inside content sections ----------------- */
+.state-msg {
+  padding-block: var(--s-6);
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: var(--t-lead);
+  line-height: 1.4;
+  color: var(--c-text-muted);
+}
+.on-brand .state-msg { color: var(--c-on-brand-muted); }
+.state-msg--error { color: var(--c-error); }
+.state-msg .link { font-family: var(--f-body); font-style: normal; margin-left: var(--s-3); }
+
+/* Map embed (replaces .map-slot once a URL is set) ------------------------ */
+.map-embed { aspect-ratio: 4 / 3; background: var(--c-bg); }
+.map-embed iframe { display: block; width: 100%; height: 100%; border: 0; }
+
+/* Booking flow ------------------------------------------------------------ */
+.booking.booking--inline { margin-top: 0; }
+.booking--inline .booking__form { box-shadow: 0 0 0 1px var(--c-line); }
+@media (max-width: 759px) {
+  .booking--inline .wrap { padding-inline: var(--s-5); }
+}
+/* errors sit under the field without changing the bar's height */
+.booking__form .field { position: relative; }
+.booking__form .field-error { position: absolute; top: 100%; left: 0; margin-top: 4px; white-space: nowrap; }
+
+.book-flow { padding-bottom: var(--section); }
+.book-flow .section-head { margin-bottom: var(--s-6); }
+.book-note { color: var(--c-text-soft); max-width: 40rem; }
+
+.quote-list .card { position: relative; }
+.quote-list .card__media { aspect-ratio: 3 / 2; }
+.quote-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  color: var(--c-text-muted);
+}
+.quote-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-3); }
+.quote-price__rate {
+  font-family: var(--f-display);
+  font-size: var(--t-h3);
+  line-height: 1.1;
+  color: var(--c-heading);
+}
+.quote-price__unit { font-size: 0.875rem; color: var(--c-text-muted); }
+.quote-unavailable { font-family: var(--f-display); font-style: italic; font-size: 1.125rem; color: var(--c-text-muted); }
+.quote-list .card[aria-current="true"] .card__media { box-shadow: 0 0 0 2px var(--c-accent); }
+.room--signature .card__media { box-shadow: inset 0 0 0 1px var(--c-accent); }
+
+.summary-total dd { font-family: var(--f-display); font-size: var(--t-h3); line-height: 1.2; color: var(--c-heading); }
+.hold-note { font-size: 0.875rem; color: var(--c-text-muted); }
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 32px;
+  padding: 0 var(--s-4);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--t-xs);
+  font-weight: 400;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  align-self: flex-start;
+}
+.status-pill--confirmed { color: var(--c-success); }
+.status-pill--pending { color: var(--c-accent-ink); }
+.status-pill--problem { color: var(--c-error); }
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Careers: openings list when there are none */
+.roles__empty { padding: var(--s-5) 0; border-bottom: 1px solid var(--c-line); color: var(--c-text-soft); }
+
+/* 404 */
+.not-found { min-height: 70vh; display: grid; align-content: center; }
