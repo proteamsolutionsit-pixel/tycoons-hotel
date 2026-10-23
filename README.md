@@ -69,7 +69,7 @@ npm install
 |---|---|
 | http://localhost:5173 | website |
 | http://localhost:5173/admin | staff admin |
-| http://localhost:8000/api/v1/docs | Swagger UI (OpenAPI at `/api/v1/openapi.json`, ReDoc at `/api/v1/redoc`) |
+| http://localhost:8000/api/v1/docs | Swagger UI (OpenAPI at `/api/v1/openapi.json`, ReDoc at `/api/v1/redoc`) - development only; switched off on staging/production |
 
 Vite proxies `/api` and `/media` to FastAPI, so the browser sees a single origin, just as it will behind nginx.
 

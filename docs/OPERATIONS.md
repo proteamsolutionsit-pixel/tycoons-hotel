@@ -54,6 +54,20 @@
 | built-in housekeeper | every minute, per instance | expires lapsed holds, purges old rate-limit rows (idempotent across instances) |
 | backups | nightly | see above |
 
+## cPanel hosting (devtycoonshotel.proteam.co.in)
+
+- CloudLinux Python Selector + Passenger, Python 3.10, app root `~/tycoons`, served through `passenger_wsgi.py` (a2wsgi).
+  The ASGI lifespan never runs there, so the built-in housekeeper is replaced by a cron job:
+  `cd ~/tycoons && ~/virtualenv/tycoons/3.10/bin/python -m app.cli housekeeping` every 5 min, plus the reconcile job above.
+- Deploy: `scripts/build-release.ps1`, upload and extract with the helpers in `scripts/cpanel.ps1`, then
+  `Restart-CpPythonApp` (touches `tmp/restart.txt`).
+- **The CSP is set in `~/public_html/.htaccess`**, in the `BEGIN/END Tycoons security headers` block (from `deploy/csp.txt`),
+  which also strips Passenger's `X-Powered-By`. On nginx hosts `deploy/nginx.conf` does this instead. Keep the block
+  outside the CloudLinux-managed sections; re-check it after changing the app in Setup Python App.
+- API docs (`/api/v1/docs`, `/openapi.json`, `/redoc`) are served only when `ENVIRONMENT` is development or test.
+- If every request returns Passenger's "something went wrong" page and `~/logs/tycoons.log` says
+  `PassengerAgent ... No such file or directory`, the host's Passenger install is broken. Only root/WHM can fix that.
+
 ## Monitoring
 
 - **Liveness** `GET /api/v1/health/live` (process up) - for the process supervisor.

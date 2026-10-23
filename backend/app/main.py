@@ -78,6 +78,9 @@ async def lifespan(_: FastAPI):
     log.info("Shutdown complete")
 
 
+# Interactive docs are a development aid; on staging/production they would publish the full API map
+_docs = settings.environment in ("development", "test")
+
 app = FastAPI(
     title=settings.app_name,
     version="1.1.0",
@@ -90,9 +93,9 @@ app = FastAPI(
         "(Asia/Kolkata) `YYYY-MM-DD`; timestamps are UTC ISO-8601."
     ),
     lifespan=lifespan,
-    docs_url=f"{API_PREFIX}/docs",
-    redoc_url=f"{API_PREFIX}/redoc",
-    openapi_url=f"{API_PREFIX}/openapi.json",
+    docs_url=f"{API_PREFIX}/docs" if _docs else None,
+    redoc_url=f"{API_PREFIX}/redoc" if _docs else None,
+    openapi_url=f"{API_PREFIX}/openapi.json" if _docs else None,
 )
 
 # Middleware runs outermost-last-added: request context -> host check -> body size -> CORS -> app
