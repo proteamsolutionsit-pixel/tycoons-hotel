@@ -27,3 +27,6 @@ Thumbs.db
 
 # Database backups: contain customer data and password hashes
 backups/
+
+# Hosting credentials (cPanel API token)
+cpanel.txt

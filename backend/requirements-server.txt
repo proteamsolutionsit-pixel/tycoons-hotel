@@ -1,0 +1,18 @@
+# Runtime for cPanel/Passenger hosting (no uvicorn: Passenger serves the app via a2wsgi).
+# Keep versions identical to requirements.txt.
+fastapi==0.161.1
+starlette==1.9.0
+SQLAlchemy==2.0.55
+PyMySQL==1.2.3
+cryptography==50.0.2
+alembic==1.20.1
+pydantic==2.14.1
+pydantic-settings==2.16.1
+email-validator==2.3.0
+python-multipart==0.0.32
+razorpay==2.0.1
+setuptools==84.2.1
+argon2-cffi==25.1.0
+bcrypt==5.0.0
+tzdata==2026.5
+a2wsgi==1.10.10

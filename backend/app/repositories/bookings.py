@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from sqlalchemy import and_, or_, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, lazyload
 
 from app.models import Booking, Payment
 from app.models.enums import BookingStatus
@@ -12,13 +12,16 @@ from app.models.enums import BookingStatus
 _OCCUPYING = (BookingStatus.CONFIRMED,)
 
 
-# Booking eagerly joins room_types; `of=Booking` keeps FOR UPDATE from also
-# locking the room type row (which would stall other checkouts for that room).
+# Booking normally eager-joins room_types. A locking read must not: with the
+# join, FOR UPDATE also locks the room type row, which stalls (MySQL) or
+# deadlocks (MariaDB, which has no "FOR UPDATE OF <table>") other checkouts
+# for that room. So locking reads load room_type lazily, in a separate,
+# non-locking SELECT.
 
 def get_by_reference(db: Session, reference: str, *, for_update: bool = False) -> Booking | None:
     stmt = select(Booking).where(Booking.reference == reference)
     if for_update:
-        stmt = stmt.with_for_update(of=Booking)
+        stmt = stmt.options(lazyload(Booking.room_type)).with_for_update()
     return db.execute(stmt).unique().scalar_one_or_none()
 
 
@@ -27,8 +30,8 @@ def get_by_idempotency_key(db: Session, key: str) -> Booking | None:
 
 
 def lock(db: Session, booking_id: int) -> Booking:
-    return db.execute(select(Booking).where(Booking.id == booking_id).with_for_update(of=Booking)
-                      .execution_options(populate_existing=True)).unique().scalar_one()
+    return db.execute(select(Booking).where(Booking.id == booking_id).options(lazyload(Booking.room_type))
+                      .with_for_update().execution_options(populate_existing=True)).unique().scalar_one()
 
 
 def overlapping_stays(db: Session, room_type_id: int, check_in: date, check_out: date, now: datetime,

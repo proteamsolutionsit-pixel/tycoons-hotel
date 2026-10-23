@@ -32,7 +32,7 @@ CURRENT_PREFIX = "/api/v1/"
 class RequestContextMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
-        self.hsts = get_settings().environment == "production"
+        self.hsts = get_settings().environment in ("staging", "production")
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":

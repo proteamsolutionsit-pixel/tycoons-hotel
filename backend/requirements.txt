@@ -17,3 +17,5 @@ argon2-cffi==25.1.0
 # only to verify (and upgrade) password hashes created before the move to Argon2id
 bcrypt==5.0.0
 tzdata==2026.5
+# WSGI bridge for cPanel/Passenger hosting (see passenger_wsgi.py)
+a2wsgi==1.10.10

@@ -31,6 +31,11 @@ from app.repositories.bookings import expire_stale_holds
 settings = get_settings()
 configure_logging(settings.log_level, settings.log_json)
 log = logging.getLogger("app")
+# Created at import, not only in lifespan: under Passenger (WSGI via a2wsgi)
+# the ASGI lifespan never runs. Housekeeping then runs from cron
+# (`python -m app.cli housekeeping`).
+(settings.storage_dir / "public").mkdir(parents=True, exist_ok=True)
+(settings.storage_dir / "private").mkdir(parents=True, exist_ok=True)
 
 
 def _housekeeping() -> None:
@@ -56,8 +61,6 @@ async def _housekeeper() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    (settings.storage_dir / "public").mkdir(parents=True, exist_ok=True)
-    (settings.storage_dir / "private").mkdir(parents=True, exist_ok=True)
     task = asyncio.create_task(_housekeeper()) if settings.environment != "test" else None
     if settings.payment_mode == "mock":
         log.warning("PAYMENT_MODE=mock: TEST PAYMENTS ONLY - no real money moves (development only)")

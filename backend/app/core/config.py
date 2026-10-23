@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "The Tycoons Hotel API"
-    environment: Literal["development", "test", "production"] = "development"
+    # staging = a public pre-production site: every production safeguard applies,
+    # but test payments (PAYMENT_MODE=mock) are allowed. production allows real payments only.
+    environment: Literal["development", "test", "staging", "production"] = "development"
     log_level: str = "INFO"
     log_json: bool = True
 
@@ -99,12 +101,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_production(self) -> "Settings":
-        if self.environment != "production":
+        if self.environment not in ("staging", "production"):
             return self
         problems = []
-        if self.payment_mode != "razorpay":
-            problems.append("PAYMENT_MODE must be razorpay (mock payments are for development only)")
-        if not (self.razorpay_key_id and self.razorpay_key_secret and self.razorpay_webhook_secret):
+        if self.environment == "production" and self.payment_mode != "razorpay":
+            problems.append("PAYMENT_MODE must be razorpay (test payments are not allowed in production)")
+        if self.payment_mode == "razorpay" and not (
+                self.razorpay_key_id and self.razorpay_key_secret and self.razorpay_webhook_secret):
             problems.append("RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are required")
         if not self.cookie_secure:
             problems.append("COOKIE_SECURE must be true (serve over HTTPS)")
@@ -117,7 +120,7 @@ class Settings(BaseSettings):
         if self.rate_limit_backend != "database":
             problems.append("RATE_LIMIT_BACKEND must be database")
         if problems:
-            raise ValueError("Unsafe production configuration: " + "; ".join(problems))
+            raise ValueError(f"Unsafe {self.environment} configuration: " + "; ".join(problems))
         return self
 
     @property

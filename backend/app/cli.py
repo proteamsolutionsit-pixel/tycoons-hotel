@@ -90,6 +90,20 @@ def cmd_expire(_args) -> int:
     return 0
 
 
+def cmd_housekeeping(_args) -> int:
+    """What the API's background loop does under uvicorn; run from cron where
+    the app is hosted under Passenger (no ASGI lifespan)."""
+    from app.core.config import get_settings
+    from app.core.rate_limit import DatabaseLimiter
+
+    with SessionLocal() as db:
+        n = expire_stale_holds(db, utcnow())
+        db.commit()
+    purged = DatabaseLimiter.purge_expired() if get_settings().rate_limit_backend == "database" else 0
+    print(f"Expired {n} hold(s); purged {purged} rate-limit row(s).")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m app.cli")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -103,6 +117,8 @@ def main(argv: list[str] | None = None) -> int:
     rc.add_argument("--older-than", type=int, default=10, help="minutes")
     rc.set_defaults(fn=cmd_reconcile)
     sub.add_parser("expire-holds").set_defaults(fn=cmd_expire)
+    sub.add_parser("housekeeping", help="Expire lapsed holds and purge old rate-limit rows (for cron)") \
+        .set_defaults(fn=cmd_housekeeping)
     args = p.parse_args(argv)
     return args.fn(args)
 
