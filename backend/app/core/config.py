@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     razorpay_webhook_secret: str = ""
     razorpay_timeout_seconds: int = 15
     currency: str = "INR"
+    # "mock" = test payments without a Razorpay account (development only;
+    # production refuses to start with it).
+    payment_mode: Literal["razorpay", "mock"] = "razorpay"
 
     # Hotel rules ------------------------------------------------------------
     hotel_name: str = "The Tycoons Hotel"
@@ -99,6 +102,8 @@ class Settings(BaseSettings):
         if self.environment != "production":
             return self
         problems = []
+        if self.payment_mode != "razorpay":
+            problems.append("PAYMENT_MODE must be razorpay (mock payments are for development only)")
         if not (self.razorpay_key_id and self.razorpay_key_secret and self.razorpay_webhook_secret):
             problems.append("RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are required")
         if not self.cookie_secure:

@@ -216,7 +216,8 @@ def ensure_order(db: Session, booking: Booking, gateway: PaymentGateway) -> Paym
 def checkout_config(booking: Booking, payment: Payment, gateway: PaymentGateway) -> CheckoutConfig:
     s = get_settings()
     return CheckoutConfig(
-        key_id=gateway.key_id, order_id=payment.razorpay_order_id, amount=payment.amount_paise,
+        key_id=gateway.key_id, mode=getattr(gateway, "mode", "razorpay"),
+        order_id=payment.razorpay_order_id, amount=payment.amount_paise,
         currency=payment.currency, name=s.hotel_name,
         description=f"{booking.room_type.name} · {booking.nights} night{'s' if booking.nights != 1 else ''}",
         prefill=CheckoutPrefill(name=booking.guest_name, email=booking.guest_email, contact=booking.guest_phone),

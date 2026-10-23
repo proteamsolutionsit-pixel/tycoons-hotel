@@ -59,7 +59,9 @@ async def lifespan(_: FastAPI):
     (settings.storage_dir / "public").mkdir(parents=True, exist_ok=True)
     (settings.storage_dir / "private").mkdir(parents=True, exist_ok=True)
     task = asyncio.create_task(_housekeeper()) if settings.environment != "test" else None
-    if not settings.razorpay_configured:
+    if settings.payment_mode == "mock":
+        log.warning("PAYMENT_MODE=mock: TEST PAYMENTS ONLY - no real money moves (development only)")
+    elif not settings.razorpay_configured:
         log.warning("Razorpay keys are not set: online booking payments are disabled")
     log.info("Startup complete", extra={"environment": settings.environment})
     yield

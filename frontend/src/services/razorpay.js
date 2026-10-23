@@ -29,6 +29,11 @@ export function loadRazorpay() {
  * `failure` holds the last payment.failed error seen, if any.
  */
 export async function openCheckout(config) {
+  if (config.mode === 'mock') {
+    // Server is in test payment mode: same flow, no Razorpay, no money.
+    const { openMockCheckout } = await import('./mockCheckout');
+    return openMockCheckout(config);
+  }
   const Razorpay = await loadRazorpay();
   return new Promise((resolve) => {
     let lastFailure = null;

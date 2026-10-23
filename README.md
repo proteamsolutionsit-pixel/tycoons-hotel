@@ -119,6 +119,14 @@ Stop the database with `.\scripts\mysql-stop.ps1`.
 
 Without keys, the site still works; online booking replies *"Online payment is not available right now"* (HTTP 503).
 
+### Without a Razorpay account: test payment mode
+
+Set `PAYMENT_MODE=mock` in `backend/.env` and restart the API. Bookings then work end to end with no Razorpay account and no money: at checkout the site shows a **"Test mode · no real payment"** window with *Pay (test)*, *Simulate failed payment* and *Cancel*.
+
+Everything except the call to Razorpay's servers is the real code path: server-side price, room hold, HMAC signature verification, the payment state machine, admin refunds and reconcile, and the audit log. Test payments appear in the admin with method `test` and ids starting `order_mock` / `pay_mock`.
+
+**Production refuses to start with `PAYMENT_MODE=mock`.** Switch back to `PAYMENT_MODE=razorpay` once real keys are in place.
+
 ### Going live
 
 Generate **Live Mode** keys and a live webhook (same URL and events), replace the three values in the production `.env`, and restart. Nothing else changes.

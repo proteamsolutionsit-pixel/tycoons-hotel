@@ -37,6 +37,8 @@ class PaymentGateway(Protocol):
 
 
 class RazorpayGateway:
+    mode = "razorpay"
+
     def __init__(self, key_id: str, key_secret: str, webhook_secret: str, timeout: int = 15):
         self.key_id = key_id
         self._webhook_secret = webhook_secret
@@ -102,9 +104,13 @@ _gateway: RazorpayGateway | None = None
 
 
 def get_gateway() -> PaymentGateway | None:
-    """FastAPI dependency. None when Razorpay keys are not configured."""
+    """FastAPI dependency. The mock gateway in PAYMENT_MODE=mock (never in
+    production); otherwise Razorpay, or None when its keys are not configured."""
     global _gateway
     s = get_settings()
+    if s.payment_mode == "mock" and s.environment != "production":
+        from app.services.mock_gateway import mock_gateway
+        return mock_gateway
     if not s.razorpay_configured:
         return None
     if _gateway is None:

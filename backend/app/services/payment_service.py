@@ -249,6 +249,47 @@ def record_client_report(db: Session, data: PaymentClientReport) -> None:
     db.commit()
 
 
+# -- Test payment mode ------------------------------------------------------
+
+def simulate_mock_payment(db: Session, order_id: str, outcome: str, gateway: PaymentGateway | None) -> dict:
+    """PAYMENT_MODE=mock only: play the customer's part in the payment window.
+    Records what "Razorpay" saw; a success returns the signed checkout response
+    the browser then sends to /payments/verify, exactly as with Razorpay."""
+    import secrets as _secrets
+
+    from app.services.mock_gateway import MockGateway
+
+    if not isinstance(gateway, MockGateway):
+        raise NotFound("Not found.")
+    payment = payment_repo.get_by_order_id(db, order_id, for_update=True)
+    if payment is None:
+        db.rollback()
+        raise NotFound("Payment not found.", code="payment_not_found")
+    booking = booking_repo.lock(db, payment.booking_id)
+    if booking.status != BookingStatus.PENDING_PAYMENT or not booking.hold_expires_at \
+            or booking.hold_expires_at <= utcnow():
+        db.rollback()
+        raise Conflict("This booking can no longer be paid. Please search again.", code="booking_expired")
+
+    pid = "pay_mock" + _secrets.token_hex(7)
+    ok = outcome == "success"
+    status = "captured" if ok else "failed"
+    entity = {"id": pid, "order_id": order_id, "amount": payment.amount_paise, "currency": payment.currency,
+              "status": status, "method": "test", "captured": ok,
+              "error_code": None if ok else "BAD_REQUEST_ERROR",
+              "error_description": None if ok else "Simulated failure (test payment mode)"}
+    payment_repo.record_event(db, source="mock", event_type="mock.payment", order_id=order_id, payment_id=pid,
+                              payload=entity, result=status)
+    if not ok:
+        _mark_failed(payment, entity)  # what the payment.failed webhook would do
+    db.commit()
+    if ok:
+        return {"razorpay_order_id": order_id, "razorpay_payment_id": pid,
+                "razorpay_signature": gateway.sign(order_id, pid)}
+    return {"error": {"code": entity["error_code"], "description": entity["error_description"],
+                      "metadata": {"payment_id": pid, "order_id": order_id}}}
+
+
 # -- Webhooks ---------------------------------------------------------------
 
 def handle_webhook(db: Session, raw_body: bytes, signature: str, event_id: str | None,

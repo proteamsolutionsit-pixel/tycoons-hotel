@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -74,6 +75,8 @@ class CheckoutConfig(BaseModel):
     """Everything Razorpay Checkout needs. Contains the public key id only."""
 
     key_id: str
+    # "mock" tells the site to show the test-payment window instead of Razorpay Checkout
+    mode: Literal["razorpay", "mock"] = "razorpay"
     order_id: str
     amount: int
     currency: str
@@ -140,6 +143,13 @@ class PaymentClientReport(BaseModel):
     razorpay_payment_id: str | None = Field(default=None, pattern=r"^pay_[A-Za-z0-9]{6,40}$")
     error_code: str | None = Field(default=None, max_length=64)
     error_description: str | None = Field(default=None, max_length=500)
+
+
+class MockCheckoutIn(BaseModel):
+    """Test payment mode only: what the simulated customer did in the payment window."""
+
+    razorpay_order_id: str = Field(pattern=r"^order_[A-Za-z0-9]{6,40}$")
+    outcome: Literal["success", "failure"]
 
 
 class PaymentResult(BaseModel):

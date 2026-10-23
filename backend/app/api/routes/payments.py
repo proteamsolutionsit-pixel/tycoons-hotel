@@ -10,7 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.rate_limit import enforce
 from app.db.session import get_db
 from app.models.enums import BookingStatus
-from app.schemas.booking import PaymentClientReport, PaymentResult, PaymentVerify
+from app.schemas.booking import MockCheckoutIn, PaymentClientReport, PaymentResult, PaymentVerify
 from app.schemas.common import Message
 from app.services import booking_service, notifications, payment_service
 from app.services.razorpay_gateway import PaymentGateway, get_gateway
@@ -39,6 +39,14 @@ def verify(data: PaymentVerify, request: Request, background: BackgroundTasks, d
         notifications.booking_needs_review(background, b)
     return PaymentResult(booking=booking_service.to_public(b),
                          message=_MESSAGES.get(b.status, "Payment status updated."))
+
+
+@router.post("/mock/checkout", include_in_schema=False)
+def mock_checkout(data: MockCheckoutIn, request: Request, db: Session = Depends(get_db),
+                  gateway: PaymentGateway | None = Depends(get_gateway)) -> dict:
+    """Test payment mode only (PAYMENT_MODE=mock, never production): 404 otherwise."""
+    enforce(request, "payment-mock", 30, 600)
+    return payment_service.simulate_mock_payment(db, data.razorpay_order_id, data.outcome, gateway)
 
 
 @router.post("/report", response_model=Message, status_code=202,
