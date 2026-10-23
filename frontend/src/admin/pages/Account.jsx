@@ -15,7 +15,7 @@ export default function Account() {
     if (form.new_password !== form.confirm) { setNotice({ type: 'error', message: 'The new passwords do not match.' }); return; }
     setBusy(true); setNotice(null);
     try {
-      await api.post('/api/admin/auth/change-password', { current_password: form.current_password, new_password: form.new_password });
+      await api.post('/api/v1/admin/auth/change-password', { current_password: form.current_password, new_password: form.new_password });
       setForm({ current_password: '', new_password: '', confirm: '' });
       setNotice({ type: 'success', message: 'Password changed. Other devices have been signed out.' });
     } catch (err) { handleError(err); setNotice({ type: 'error', message: err.message }); } finally { setBusy(false); }

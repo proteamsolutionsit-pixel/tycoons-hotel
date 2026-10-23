@@ -151,6 +151,7 @@ export default function BookingStatus() {
                 {booking.tax_paise > 0 && <div><dt>Taxes</dt><dd>{rupees(booking.tax_paise)}</dd></div>}
                 <div className="summary-total"><dt>{booking.status === 'confirmed' ? 'Paid' : 'Total'}</dt><dd>{rupees(booking.total_paise)}</dd></div>
                 {booking.confirmed_at && <div><dt>Confirmed</dt><dd>{dateTime(booking.confirmed_at)}</dd></div>}
+                {booking.cancellation_policy && <div><dt>Cancellation policy</dt><dd>{booking.cancellation_policy}</dd></div>}
               </dl>
             </>
           )}

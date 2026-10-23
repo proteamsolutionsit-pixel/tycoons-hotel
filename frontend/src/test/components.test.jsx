@@ -20,7 +20,7 @@ describe('api client', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(jsonResponse(422, {
       error: { code: 'validation_error', message: 'Please check the highlighted fields.', details: [{ field: 'email', message: 'Bad email' }] },
     }));
-    const err = await request('/api/x', { method: 'POST', body: {} }).catch((e) => e);
+    const err = await request('/api/v1/x', { method: 'POST', body: {} }).catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(422);
     expect(err.fieldErrors).toEqual({ email: 'Bad email' });
@@ -28,7 +28,7 @@ describe('api client', () => {
 
   it('reports network failures plainly', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
-    const err = await request('/api/x').catch((e) => e);
+    const err = await request('/api/v1/x').catch((e) => e);
     expect(err.code).toBe('network_error');
   });
 });

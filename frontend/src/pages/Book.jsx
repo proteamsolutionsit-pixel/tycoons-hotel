@@ -8,6 +8,7 @@ import { Check, Field, FormStatus } from '../components/forms/Fields';
 import { rules, useForm } from '../components/forms/useForm';
 import { StateMessage } from '../components/Sections';
 import { SplitText } from '../components/SplitText';
+import { useSite } from '../context/SiteContext';
 import { usePageMotion } from '../motion/usePageMotion';
 import { ApiError, siteApi } from '../services/api';
 import { openCheckout } from '../services/razorpay';
@@ -134,6 +135,7 @@ export default function Book() {
 }
 
 function GuestDetails({ quote, stay, onBooked }) {
+  const { settings } = useSite();
   const idempotencyKey = useRef(uuid());
   const [pending, setPending] = useState(null); // {booking, checkout} after a dismissed checkout
   const navigate = useNavigate();
@@ -206,6 +208,9 @@ function GuestDetails({ quote, stay, onBooked }) {
           {quote.tax_paise > 0 && <div><dt>Taxes ({Number(quote.tax_percent)}%)</dt><dd>{rupees(quote.tax_paise)}</dd></div>}
           <div className="summary-total"><dt>Total</dt><dd>{rupees(quote.total_paise)}</dd></div>
         </dl>
+        {settings.cancellation_policy && (
+          <p className="hold-note"><strong>Cancellation policy.</strong> {settings.cancellation_policy}</p>
+        )}
         <p className="hold-note">Your room is held for 15 minutes once you continue to payment. Payments are processed securely by Razorpay; we never see or store your card details.</p>
       </div>
 

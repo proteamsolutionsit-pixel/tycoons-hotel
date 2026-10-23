@@ -25,9 +25,8 @@ const FIELDS = [
 export default function RoomTypes() {
   return (
     <>
-      <PageTitle title="Rooms & rates" />
-      <p className="adm-muted">Rates apply to new bookings only; existing bookings keep the price they were made at.</p>
-      <ResourceManager endpoint="/api/admin/room-types" noun="Room type" fields={FIELDS}
+      <PageTitle title="Rooms & rates" subtitle="Rates apply to new bookings only; existing bookings keep the price they were made at. Every change is recorded in the audit log." />
+      <ResourceManager endpoint="/api/v1/admin/room-types" noun="Room type" fields={FIELDS} managePermission="catalog.manage"
         defaults={{ max_adults: 2, max_children: 1, total_rooms: 1, is_active: true, sort_order: 10 }}
         columns={[
           { label: 'Order', key: 'sort_order' },

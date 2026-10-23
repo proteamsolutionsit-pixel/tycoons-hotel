@@ -7,7 +7,7 @@ const thumb = (key = 'image_url') => ({ label: 'Photo', render: (r) => <img src=
 
 const TABS = {
   treatments: {
-    label: 'Spa treatments', endpoint: '/api/admin/spa-treatments', noun: 'Treatment',
+    label: 'Spa treatments', endpoint: '/api/v1/admin/spa-treatments', noun: 'Treatment',
     defaults: { duration_label: '', price_label: '', is_active: true },
     fields: [
       { name: 'name', label: 'Card title', help: 'e.g. Soothing Massages' },
@@ -24,7 +24,7 @@ const TABS = {
     columns: [thumb(), { label: 'Treatment', key: 'name' }, { label: 'Duration', key: 'duration_label' }, { label: 'Price', key: 'price_label' }, active],
   },
   cards: {
-    label: 'Page cards', endpoint: '/api/admin/content-cards', noun: 'Card',
+    label: 'Page cards', endpoint: '/api/v1/admin/content-cards', noun: 'Card',
     defaults: { section: 'dining_menu', is_active: true },
     fields: [
       { name: 'section', label: 'Where it appears', type: 'select', options: [
@@ -42,7 +42,7 @@ const TABS = {
     columns: [thumb(), { label: 'Section', render: (r) => r.section.replace(/_/g, ' ') }, { label: 'Title', key: 'title' }, { label: 'Order', key: 'sort_order' }, active],
   },
   gallery: {
-    label: 'Gallery', endpoint: '/api/admin/gallery', noun: 'Photo',
+    label: 'Gallery', endpoint: '/api/v1/admin/gallery', noun: 'Photo',
     defaults: { category: 'rooms', layout: 'normal', is_active: true, on_home: false },
     fields: [
       { name: 'image_url', label: 'Photo', type: 'image', wide: true },
@@ -60,7 +60,7 @@ const TABS = {
       { label: 'Homepage', render: (r) => (r.on_home ? `#${r.home_order}` : '—') }, active],
   },
   openings: {
-    label: 'Job openings', endpoint: '/api/admin/job-openings', noun: 'Opening',
+    label: 'Job openings', endpoint: '/api/v1/admin/job-openings', noun: 'Opening',
     defaults: { employment_type: 'Full-time', is_active: true },
     fields: [
       { name: 'title', label: 'Role title' },
@@ -86,7 +86,7 @@ export default function Content() {
           <button key={k} type="button" role="tab" aria-selected={k === tab} onClick={() => setParams({ tab: k })}>{v.label}</button>
         ))}
       </div>
-      <ResourceManager key={tab} {...t} />
+      <ResourceManager key={tab} {...t} managePermission="content.manage" />
     </>
   );
 }

@@ -45,7 +45,7 @@ export async function request(path, { method = 'GET', body, query, headers = {},
     h['Content-Type'] = 'application/json';
     payload = JSON.stringify(body);
   }
-  if (method !== 'GET' && path.startsWith('/api/admin')) {
+  if (method !== 'GET' && path.startsWith('/api/v1/admin')) {
     const csrf = readCookie('tyc_csrf');
     if (csrf) h['X-CSRF-Token'] = csrf;
   }
@@ -85,23 +85,23 @@ export const api = {
 
 /* Public endpoints */
 export const siteApi = {
-  site: () => api.get('/api/site'),
-  rooms: () => api.get('/api/rooms'),
-  treatments: () => api.get('/api/spa/treatments'),
-  cards: (section) => api.get('/api/content/cards', { section }),
-  gallery: (query) => api.get('/api/gallery', { limit: 100, ...query }),
-  openings: () => api.get('/api/careers/openings'),
-  availability: (q) => api.get('/api/bookings/availability', q),
+  site: () => api.get('/api/v1/site'),
+  rooms: () => api.get('/api/v1/rooms'),
+  treatments: () => api.get('/api/v1/spa/treatments'),
+  cards: (section) => api.get('/api/v1/content/cards', { section }),
+  gallery: (query) => api.get('/api/v1/gallery', { limit: 100, ...query }),
+  openings: () => api.get('/api/v1/careers/openings'),
+  availability: (q) => api.get('/api/v1/bookings/availability', q),
   createBooking: (body, idempotencyKey) =>
-    api.post('/api/bookings', body, { headers: { 'Idempotency-Key': idempotencyKey } }),
-  lookupBooking: (reference, email) => api.post('/api/bookings/lookup', { reference, email }),
-  retryPayment: (reference, email) => api.post(`/api/bookings/${encodeURIComponent(reference)}/payment`, { reference, email }),
-  verifyPayment: (body) => api.post('/api/payments/verify', body),
-  reportPayment: (body) => api.post('/api/payments/report', body),
-  tableReservation: (body) => api.post('/api/dining/reservations', body),
-  spaAppointment: (body) => api.post('/api/spa/appointments', body),
-  businessEnquiry: (body) => api.post('/api/enquiries/business', body),
-  contactEnquiry: (body) => api.post('/api/enquiries/contact', body),
-  jobApplication: (form) => api.upload('/api/careers/applications', form),
-  newsletter: (body) => api.post('/api/newsletter', body),
+    api.post('/api/v1/bookings', body, { headers: { 'Idempotency-Key': idempotencyKey } }),
+  lookupBooking: (reference, email) => api.post('/api/v1/bookings/lookup', { reference, email }),
+  retryPayment: (reference, email) => api.post(`/api/v1/bookings/${encodeURIComponent(reference)}/payment`, { reference, email }),
+  verifyPayment: (body) => api.post('/api/v1/payments/verify', body),
+  reportPayment: (body) => api.post('/api/v1/payments/report', body),
+  tableReservation: (body) => api.post('/api/v1/dining/reservations', body),
+  spaAppointment: (body) => api.post('/api/v1/spa/appointments', body),
+  businessEnquiry: (body) => api.post('/api/v1/enquiries/business', body),
+  contactEnquiry: (body) => api.post('/api/v1/enquiries/contact', body),
+  jobApplication: (form) => api.upload('/api/v1/careers/applications', form),
+  newsletter: (body) => api.post('/api/v1/newsletter', body),
 };

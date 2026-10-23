@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import { dateTime, longDate } from '../../utils/format';
 import { useAuth } from '../auth';
-import { Badge, Drawer, Notice, PageTitle, Pager, SearchBox, StateRow, useAdminList } from '../ui';
+import { Badge, Drawer, Notice, PageTitle, Pager, SearchBox, StateRow, useAdminList, useToast } from '../ui';
 
 const TABS = {
   'table-reservations': {
@@ -32,7 +32,7 @@ const TABS = {
     label: 'Job applications',
     cols: [['Applicant', (r) => <>{r.name}<br /><span className="adm-muted">{r.email}</span></>], ['Position', (r) => r.position], ['CV', (r) => (r.has_cv ? 'Yes' : '—')]],
     detail: (r) => [['Name', r.name], ['Email', <a href={`mailto:${r.email}`}>{r.email}</a>], ['Phone', r.phone], ['Position', r.position],
-      ['Message', r.message], ['CV', r.has_cv ? <a href={`/api/admin/submissions/applications/${r.id}/cv`}>Download {r.cv_original_name}</a> : 'None']],
+      ['Message', r.message], ['CV', r.has_cv ? <a href={`/api/v1/admin/submissions/applications/${r.id}/cv`}>Download {r.cv_original_name}</a> : 'None']],
   },
 };
 
@@ -58,7 +58,7 @@ function SubmissionList({ kind }) {
   const [q, setQ] = useState('');
   const [offset, setOffset] = useState(0);
   const [open, setOpen] = useState(null);
-  const list = useAdminList(`/api/admin/submissions/${kind}`, { status, q, offset, limit: 25 });
+  const list = useAdminList(`/api/v1/admin/submissions/${kind}`, { status, q, offset, limit: 25 });
 
   return (
     <>
@@ -100,7 +100,7 @@ function SubmissionDetail({ kind, item, cfg, onClose, onSaved }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const r = await api.patch(`/api/admin/submissions/${kind}/${item.id}`, { status, staff_notes: notes || null });
+      const r = await api.patch(`/api/v1/admin/submissions/${kind}/${item.id}`, { status, staff_notes: notes || null });
       setNotice({ type: 'success', message: 'Saved.' });
       onSaved(r);
     } catch (err) { handleError(err); setNotice({ type: 'error', message: err.message }); } finally { setBusy(false); }
@@ -129,12 +129,13 @@ function SubmissionDetail({ kind, item, cfg, onClose, onSaved }) {
 
 function Newsletter() {
   const { handleError } = useAuth();
+  const toast = useToast();
   const [q, setQ] = useState('');
   const [offset, setOffset] = useState(0);
-  const list = useAdminList('/api/admin/submissions/newsletter', { q, offset, limit: 50 });
+  const list = useAdminList('/api/v1/admin/submissions/newsletter', { q, offset, limit: 50 });
   const toggle = async (s) => {
-    try { await api.patch(`/api/admin/submissions/newsletter/${s.id}`, { is_active: !s.is_active }); list.reload(); }
-    catch (err) { handleError(err); window.alert(err.message); }
+    try { await api.patch(`/api/v1/admin/submissions/newsletter/${s.id}`, { is_active: !s.is_active }); list.reload(); }
+    catch (err) { handleError(err); toast(err.message, 'error'); }
   };
   return (
     <>

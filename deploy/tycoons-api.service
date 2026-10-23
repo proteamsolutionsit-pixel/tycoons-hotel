@@ -1,16 +1,32 @@
 # /etc/systemd/system/tycoons-api.service  (example)
 [Unit]
 Description=The Tycoons Hotel API (FastAPI / uvicorn)
-After=network.target mysql.service
+After=network-online.target mysql.service
+Wants=network-online.target
 
 [Service]
 User=tycoons
+Group=tycoons
 WorkingDirectory=/srv/tycoons/backend
+# KEY=value lines only; comments on their own lines (systemd keeps trailing "# ..." as part of the value)
 EnvironmentFile=/srv/tycoons/backend/.env
-# One worker: the rate limiter is in-process (see README > Production notes).
-ExecStart=/srv/tycoons/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
+# Rate limits live in MySQL, so several workers share them safely.
+ExecStart=/srv/tycoons/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 \
+  --proxy-headers --forwarded-allow-ips=127.0.0.1 --timeout-keep-alive 5 --timeout-graceful-shutdown 30 \
+  --limit-concurrency 200 --no-server-header
 Restart=always
 RestartSec=3
+TimeoutStopSec=40
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/tycoons/backend/storage
+CapabilityBoundingSet=
+LockPersonality=true
+RestrictSUIDSGID=true
 
 [Install]
 WantedBy=multi-user.target

@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { dateTime, rupees } from '../../utils/format';
-import { Badge, PageTitle, Pager, SearchBox, StateRow, useAdminList } from '../ui';
+import { Badge, PageTitle, Pager, SearchBox, SortHeader, StateRow, useAdminList } from '../ui';
 
 const STATUSES = ['', 'created', 'authorized', 'captured', 'failed', 'refund_pending', 'refunded'];
 
@@ -8,39 +8,54 @@ export default function Payments() {
   const [params, setParams] = useSearchParams();
   const status = params.get('status') || '';
   const q = params.get('q') || '';
+  const sort = params.get('sort') || 'created_at';
+  const order = params.get('order') || 'desc';
   const offset = Number(params.get('offset') || 0);
-  const list = useAdminList('/api/admin/payments', { status, q, offset, limit: 25 });
-  const update = (k, v) => { const p = new URLSearchParams(params); if (v) p.set(k, v); else p.delete(k); if (k !== 'offset') p.delete('offset'); setParams(p); };
+  const list = useAdminList('/api/v1/admin/payments', { status, q, sort, order, offset, limit: 25 });
+  const update = (changes) => {
+    const p = new URLSearchParams(params);
+    Object.entries(changes).forEach(([k, v]) => (v ? p.set(k, v) : p.delete(k)));
+    if (!('offset' in changes)) p.delete('offset');
+    setParams(p);
+  };
+  const sortProps = { sort, order, onSort: (f, o) => update({ sort: f, order: o }) };
 
   return (
     <>
-      <PageTitle title="Payments" />
-      <div className="adm-toolbar">
-        <SearchBox value={q} onChange={(v) => update('q', v)} placeholder="Order / payment id, reference or guest" />
-        <select className="adm-input" value={status} onChange={(e) => update('status', e.target.value)} aria-label="Status">
+      <PageTitle title="Payments" subtitle="Razorpay orders, captures and refunds. No card details are stored." />
+      <div className="adm-toolbar" role="search">
+        <SearchBox value={q} onChange={(v) => update({ q: v })} placeholder="Order / payment id, reference or guest" />
+        <select className="adm-input" value={status} onChange={(e) => update({ status: e.target.value })} aria-label="Status">
           {STATUSES.map((s) => <option key={s} value={s}>{s ? s.replace(/_/g, ' ') : 'All statuses'}</option>)}
         </select>
       </div>
       <div className="adm-table-wrap">
         <table className="adm-table">
-          <thead><tr><th>Booking</th><th>Guest</th><th>Razorpay order</th><th>Payment</th><th>Amount</th><th>Status</th><th>Captured</th></tr></thead>
+          <thead><tr>
+            <th>Booking</th><th>Guest</th><th>Razorpay order</th><th>Payment / refund</th>
+            <SortHeader label="Amount" field="amount" {...sortProps} />
+            <SortHeader label="Status" field="status" {...sortProps} />
+            <SortHeader label="Captured" field="captured_at" {...sortProps} />
+            <SortHeader label="Created" field="created_at" {...sortProps} />
+          </tr></thead>
           <tbody>
-            <StateRow state={list} cols={7} empty="No payments match." />
+            <StateRow state={list} cols={8} empty="No payments match these filters." />
             {list.data?.items.map((p) => (
               <tr key={p.id}>
                 <td className="adm-mono"><Link to={`/admin/bookings?q=${p.booking_reference}`}>{p.booking_reference}</Link></td>
                 <td>{p.guest_name}</td>
                 <td className="adm-mono">{p.razorpay_order_id}</td>
-                <td className="adm-mono">{p.razorpay_payment_id || '—'}</td>
-                <td>{rupees(p.amount_paise)}</td>
+                <td className="adm-mono">{p.razorpay_payment_id || '—'}{p.razorpay_refund_id && <><br /><span className="adm-muted">{p.razorpay_refund_id}</span></>}</td>
+                <td className="adm-num">{rupees(p.amount_paise)}</td>
                 <td><Badge value={p.status} /></td>
                 <td className="adm-muted">{dateTime(p.captured_at)}</td>
+                <td className="adm-muted">{dateTime(p.created_at)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <Pager page={list.data} onChange={(o) => update('offset', String(o))} />
+      <Pager page={list.data} onChange={(o) => update({ offset: String(o) })} />
     </>
   );
 }

@@ -3,19 +3,19 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../auth';
-import { Notice, PageTitle, useAdminList } from '../ui';
+import { Notice, PageTitle, useAdminList, useToast } from '../ui';
 
 const GROUPS = { contact: 'Contact details', social: 'Social links', home: 'Homepage', rooms: 'Rooms & booking',
   dining: 'Fishy Tales', wellness: 'Kai Wellness Spa', lounge: 'Business Lounge', general: 'General' };
 
 export default function Settings() {
-  const list = useAdminList('/api/admin/settings');
+  const list = useAdminList('/api/v1/admin/settings');
   const groups = {};
   (list.data || []).forEach((s) => { (groups[s.group] ||= []).push(s); });
   return (
     <>
       <PageTitle title="Site settings" />
-      <p className="adm-muted">Values in [brackets] are the design’s placeholders. Replace them with the hotel’s real details.</p>
+      <p className="adm-notice adm-notice--info">Values in [brackets] are the design’s placeholders. Replace them with the hotel’s real details. Every change is recorded in the audit log.</p>
       {list.error && <p className="adm-error">{list.error.message}</p>}
       {Object.entries(groups).map(([g, items]) => (
         <section key={g} className="adm-section">
@@ -28,7 +28,9 @@ export default function Settings() {
 }
 
 function SettingEditor({ setting }) {
-  const { isAdmin, handleError } = useAuth();
+  const { can, handleError } = useAuth();
+  const toast = useToast();
+  const isAdmin = can('settings.manage');
   const [value, setValue] = useState(setting.value);
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -44,10 +46,10 @@ function SettingEditor({ setting }) {
       let v = value;
       if (isList) v = value.map((x) => x.trim()).filter(Boolean);
       if (isNumber) v = Number(value);
-      const saved = await api.put(`/api/admin/settings/${setting.key}`, { value: v });
+      const saved = await api.put(`/api/v1/admin/settings/${setting.key}`, { value: v });
       setting.value = saved.value;
       setValue(saved.value);
-      setNotice({ type: 'success', message: 'Saved' });
+      toast(`Saved: ${setting.label}`);
     } catch (err) { handleError(err); setNotice({ type: 'error', message: err.message }); } finally { setBusy(false); }
   };
 

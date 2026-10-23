@@ -1,10 +1,11 @@
 /* Generic list + edit drawer for simple admin tables (room types, spa
-   treatments, content cards, gallery, job openings). */
+   treatments, content cards, gallery, job openings). Editing controls appear
+   only with `managePermission`; the API enforces it regardless. */
 import { useState } from 'react';
 import { api, ApiError } from '../services/api';
 import { rupees } from '../utils/format';
 import { useAuth } from './auth';
-import { Drawer, Notice, Pager, StateRow, useAdminList } from './ui';
+import { ConfirmDialog, Drawer, Notice, Pager, StateRow, useAdminList, useToast } from './ui';
 
 function toForm(fields, item) {
   const v = {};
@@ -31,7 +32,7 @@ function fromForm(fields, values, isNew) {
   return out;
 }
 
-function ImageInput({ value, onChange, id }) {
+function ImageInput({ value, onChange, id, disabled }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const upload = async (file) => {
@@ -40,38 +41,42 @@ function ImageInput({ value, onChange, id }) {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const res = await api.upload('/api/admin/uploads/image', fd);
+      const res = await api.upload('/api/v1/admin/uploads/image', fd);
       onChange(res.url);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
   return (
     <div className="adm-image">
       {value && <img src={value} alt="" />}
-      <input id={id} className="adm-input" value={value} onChange={(e) => onChange(e.target.value)} placeholder="/assets/img/… or upload" />
-      <label className="adm-btn adm-btn--ghost">
-        {busy ? 'Uploading…' : 'Upload image'}
-        <input type="file" accept=".jpg,.jpeg,.png,.webp" hidden onChange={(e) => upload(e.target.files?.[0])} />
-      </label>
-      {err && <span className="adm-error">{err}</span>}
+      <input id={id} className="adm-input" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} placeholder="/assets/img/… or upload" />
+      {!disabled && (
+        <label className="adm-btn adm-btn--ghost adm-btn--sm">
+          {busy ? 'Uploading…' : 'Upload image'}
+          <input type="file" accept=".jpg,.jpeg,.png,.webp" hidden onChange={(e) => upload(e.target.files?.[0])} />
+        </label>
+      )}
+      {err && <span className="adm-error" role="alert">{err}</span>}
     </div>
   );
 }
 
-export function FieldInput({ field: f, value, onChange, error }) {
+export function FieldInput({ field: f, value, onChange, error, disabled }) {
   const id = `fld-${f.name}`;
+  const errId = error ? `${id}-err` : undefined;
+  const common = { id, disabled, 'aria-invalid': error ? true : undefined, 'aria-describedby': errId };
   let control;
-  if (f.type === 'textarea') control = <textarea id={id} className="adm-input" rows={f.rows || 4} value={value} onChange={(e) => onChange(e.target.value)} />;
+  if (f.type === 'textarea') control = <textarea {...common} className="adm-input" rows={f.rows || 4} value={value} onChange={(e) => onChange(e.target.value)} />;
   else if (f.type === 'select') {
     control = (
-      <select id={id} className="adm-input" value={value} onChange={(e) => onChange(e.target.value)}>
+      <select {...common} className="adm-input" value={value} onChange={(e) => onChange(e.target.value)}>
         {f.options.map((o) => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}
       </select>
     );
   } else if (f.type === 'checkbox') {
-    control = <input id={id} type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)} />;
-  } else if (f.type === 'image') control = <ImageInput id={id} value={value} onChange={onChange} />;
+    control = <input {...common} type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)} />;
+  } else if (f.type === 'image') control = <ImageInput id={id} value={value} onChange={onChange} disabled={disabled} />;
   else {
-    control = <input id={id} className="adm-input" type={f.type === 'money' || f.type === 'number' ? 'number' : 'text'}
+    control = <input {...common} className="adm-input" type={f.type === 'money' || f.type === 'number' ? 'number' : 'text'}
       step={f.type === 'money' ? '1' : undefined} min={f.min} value={value} onChange={(e) => onChange(e.target.value)} />;
   }
   return (
@@ -79,13 +84,15 @@ export function FieldInput({ field: f, value, onChange, error }) {
       <label htmlFor={id}>{f.label}{f.type === 'money' ? ' (₹)' : ''}</label>
       {control}
       {f.help && <small className="adm-muted">{f.help}</small>}
-      {error && <small className="adm-error">{error}</small>}
+      {error && <small className="adm-error" id={errId}>{error}</small>}
     </div>
   );
 }
 
-export default function ResourceManager({ endpoint, fields, columns, noun, query, defaults = {} }) {
-  const { isAdmin, handleError } = useAuth();
+export default function ResourceManager({ endpoint, fields, columns, noun, query, defaults = {}, managePermission }) {
+  const { can, handleError } = useAuth();
+  const toast = useToast();
+  const canManage = can(managePermission);
   const [offset, setOffset] = useState(0);
   const list = useAdminList(endpoint, { ...query, limit: 50, offset });
   const [editing, setEditing] = useState(null); // {item|null}
@@ -93,6 +100,7 @@ export default function ResourceManager({ endpoint, fields, columns, noun, query
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const open = (item) => {
     setEditing({ item });
@@ -109,7 +117,7 @@ export default function ResourceManager({ endpoint, fields, columns, noun, query
       const body = fromForm(fields, values, isNew);
       if (isNew) await api.post(endpoint, body); else await api.patch(`${endpoint}/${editing.item.id}`, body);
       setEditing(null);
-      setNotice({ type: 'success', message: `${noun} ${isNew ? 'created' : 'saved'}.` });
+      toast(`${noun} ${isNew ? 'created' : 'saved'}.`);
       list.reload();
     } catch (err) {
       handleError(err);
@@ -119,29 +127,30 @@ export default function ResourceManager({ endpoint, fields, columns, noun, query
   };
 
   const remove = async () => {
-    if (!window.confirm(`Delete this ${noun.toLowerCase()}? This cannot be undone.`)) return;
+    setSaving(true);
     try {
       await api.del(`${endpoint}/${editing.item.id}`);
+      setConfirmDelete(false);
       setEditing(null);
-      setNotice({ type: 'success', message: `${noun} deleted.` });
+      toast(`${noun} deleted.`);
       list.reload();
-    } catch (err) { handleError(err); setNotice({ type: 'error', message: err.message }); }
+    } catch (err) { handleError(err); setConfirmDelete(false); setNotice({ type: 'error', message: err.message }); }
+    finally { setSaving(false); }
   };
 
   const items = list.data?.items || [];
   return (
     <>
-      {!editing && <Notice notice={notice} onClose={() => setNotice(null)} />}
-      {isAdmin && <div className="adm-toolbar"><button type="button" className="adm-btn" onClick={() => open(null)}>New {noun.toLowerCase()}</button></div>}
+      {canManage && <div className="adm-toolbar"><button type="button" className="adm-btn" onClick={() => open(null)}>New {noun.toLowerCase()}</button></div>}
       <div className="adm-table-wrap">
         <table className="adm-table">
           <thead><tr>{columns.map((c) => <th key={c.label}>{c.label}</th>)}</tr></thead>
           <tbody>
-            <StateRow state={list} cols={columns.length} />
+            <StateRow state={list} cols={columns.length} empty={`No ${noun.toLowerCase()}s yet.`} />
             {items.map((it) => (
               <tr key={it.id} className="adm-row-link" tabIndex={0} onClick={() => open(it)}
                 onKeyDown={(e) => { if (e.key === 'Enter') open(it); }}>
-                {columns.map((c) => <td key={c.label}>{c.render ? c.render(it) : c.money ? rupees(it[c.key]) : String(it[c.key] ?? '')}</td>)}
+                {columns.map((c) => <td key={c.label} className={c.money ? 'adm-num' : undefined}>{c.render ? c.render(it) : c.money ? rupees(it[c.key]) : String(it[c.key] ?? '')}</td>)}
               </tr>
             ))}
           </tbody>
@@ -150,21 +159,28 @@ export default function ResourceManager({ endpoint, fields, columns, noun, query
       <Pager page={list.data} onChange={setOffset} />
 
       {editing && (
-        <Drawer title={editing.item ? `Edit ${noun.toLowerCase()}` : `New ${noun.toLowerCase()}`} onClose={() => setEditing(null)}>
-          <form className="adm-form" onSubmit={save}>
+        <Drawer title={editing.item ? (canManage ? `Edit ${noun.toLowerCase()}` : noun) : `New ${noun.toLowerCase()}`} onClose={() => setEditing(null)}>
+          <form className="adm-form" onSubmit={save} noValidate>
             <Notice notice={notice} />
+            {!canManage && <p className="adm-notice adm-notice--info adm-field--wide">Read only: your role can view but not change this.</p>}
             {fields.filter((f) => !(f.createOnly && editing.item)).map((f) => (
-              <FieldInput key={f.name} field={f} value={values[f.name]} error={errors[f.name]}
+              <FieldInput key={f.name} field={f} value={values[f.name]} error={errors[f.name]} disabled={!canManage}
                 onChange={(v) => setValues((s) => ({ ...s, [f.name]: v }))} />
             ))}
-            {isAdmin ? (
+            {canManage && (
               <div className="adm-form__actions">
                 <button className="adm-btn" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-                {editing.item && <button className="adm-btn adm-btn--danger" type="button" onClick={remove}>Delete</button>}
+                {editing.item && <button className="adm-btn adm-btn--danger" type="button" onClick={() => setConfirmDelete(true)}>Delete</button>}
               </div>
-            ) : <p className="adm-muted">Only administrators can change this.</p>}
+            )}
           </form>
         </Drawer>
+      )}
+      {confirmDelete && (
+        <ConfirmDialog title={`Delete this ${noun.toLowerCase()}?`} danger confirmLabel="Delete" busy={saving}
+          onCancel={() => setConfirmDelete(false)} onConfirm={remove}>
+          <p>This cannot be undone. If it is in use (for example a room type with bookings) the system will refuse; set it inactive instead.</p>
+        </ConfirmDialog>
       )}
     </>
   );

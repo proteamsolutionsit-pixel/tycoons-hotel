@@ -40,14 +40,15 @@ Requirements: Python 3.12, Node 20+, Git. On this machine they were installed wi
 
 ```powershell
 # 1. Database (MySQL 8.4 "ZIP Archive" build unpacked to .tools\mysql)
-.\scripts\mysql-init.ps1          # creates DBs tycoons + tycoons_test, user, writes backend\.env
+.\scripts\mysql-init.ps1          # creates DBs tycoons + tycoons_test and the schema owner, writes backend\.env
 
 # 2. Backend
 cd backend
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements-dev.txt
-# edit backend\.env: JWT_SECRET and the Razorpay test keys (see below)
-.\.venv\Scripts\alembic upgrade head
+# edit backend\.env: the Razorpay test keys (see below)
+.\.venv\Scripts\alembic upgrade head           # runs as the schema owner
+..\scripts\mysql-grant-app-user.ps1            # DML-only runtime account; points DATABASE_URL at it
 .\.venv\Scripts\python -m app.cli seed
 $env:ADMIN_PASSWORD = 'Choose-A-Strong-Pass1'  # pragma: allowlist secret
 .\.venv\Scripts\python -m app.cli create-admin --email you@yourhotel.com --name "Your Name"
@@ -68,7 +69,7 @@ npm install
 |---|---|
 | http://localhost:5173 | website |
 | http://localhost:5173/admin | staff admin |
-| http://localhost:8000/api/docs | Swagger UI (OpenAPI at `/api/openapi.json`, ReDoc at `/api/redoc`) |
+| http://localhost:8000/api/v1/docs | Swagger UI (OpenAPI at `/api/v1/openapi.json`, ReDoc at `/api/v1/redoc`) |
 
 Vite proxies `/api` and `/media` to FastAPI, so the browser sees a single origin, just as it will behind nginx.
 
@@ -80,10 +81,15 @@ Stop the database with `.\scripts\mysql-stop.ps1`.
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | `mysql+pymysql://user:pass@host:port/tycoons?charset=utf8mb4` | <!-- pragma: allowlist secret -->
+| `DATABASE_URL` | runtime account, DML only: `mysql+pymysql://tycoons_app:…@host:port/tycoons?charset=utf8mb4` |
+| `MIGRATION_DATABASE_URL` | schema owner, used only by Alembic |
 | `TEST_DATABASE_URL` | used only by pytest; its tables are dropped and recreated |
-| `JWT_SECRET` | signs staff sessions. Use 32+ random characters (required in production) |
+| `DATABASE_SSL_CA` | CA bundle path: requires TLS to MySQL (use when the DB is on another host) |
+| `ALLOWED_HOSTS` | Host headers the API answers to (production: your domain) |
+| `PUBLIC_BASE_URL` | public https URL, used in password-reset emails |
+| `SESSION_IDLE_MINUTES` / `SESSION_ABSOLUTE_HOURS` | staff session limits (30 min / 12 h) |
 | `COOKIE_SECURE` | `true` behind HTTPS (required in production) |
+| `RATE_LIMIT_BACKEND` | `database` (shared across workers; required in production) or `memory` |
 | `CORS_ORIGINS` | comma-separated browser origins. Not needed when the site and API share an origin |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | API keys. Only the key **id** ever reaches the browser |
 | `RAZORPAY_WEBHOOK_SECRET` | the secret you type when creating the webhook |
@@ -103,7 +109,7 @@ Stop the database with `.\scripts\mysql-stop.ps1`.
 1. Razorpay Dashboard → switch to **Test Mode** → *Account & Settings → API Keys* → generate keys (`rzp_test_…`).
 2. Put them in `backend/.env` as `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`, then restart the API.
 3. *Account & Settings → Webhooks → Add*:
-   - URL: `https://<your-domain>/api/payments/webhook`
+   - URL: `https://<your-domain>/api/v1/payments/webhook` (the pre-1.1 URL `/api/payments/webhook` still works)
    - Secret: any strong string, copied into `RAZORPAY_WEBHOOK_SECRET`
    - Events: `payment.captured`, `payment.failed`, `payment.authorized`, `order.paid`, `refund.processed`, `refund.failed`
 
@@ -122,7 +128,7 @@ Generate **Live Mode** keys and a live webhook (same URL and events), replace th
 - The **server** computes the price from the database. Any amount sent by the browser is ignored.
 - The booking holds a room for `BOOKING_HOLD_MINUTES`. The room-type row is locked while inventory is re-checked, so parallel checkouts cannot oversell. A test fires 6 simultaneous checkouts at a 2-room suite and exactly 2 succeed.
 - A browser retry with the same `Idempotency-Key` returns the same booking and order. It never creates a second one.
-- The checkout response is **untrusted**. `POST /api/payments/verify` checks the HMAC signature with the key secret, then fetches the payment from Razorpay and confirms the booking only if it is `captured` for the exact order, amount and currency.
+- The checkout response is **untrusted**. `POST /api/v1/payments/verify` checks the HMAC signature with the key secret, then fetches the payment from Razorpay and confirms the booking only if it is `captured` for the exact order, amount and currency.
 - Webhooks are verified against the **raw request body** and deduplicated by `x-razorpay-event-id`. Replays are acknowledged and ignored.
 - Statuses never move backwards: a late `payment.failed` cannot undo a capture.
 - **Money arrives after the hold lapsed:** the booking is confirmed if a room is still free. Otherwise it is marked **payment_review**, and staff are notified so they can rehouse or refund.
@@ -132,77 +138,88 @@ Generate **Live Mode** keys and a live webhook (same URL and events), replace th
 
 ---
 
-## Tests
+## Tests and quality gates
 
 ```powershell
-cd backend;  .\.venv\Scripts\python -m pytest       # 76 tests, real MySQL (tycoons_test)
-cd frontend; npm test                               # 10 tests (vitest + Testing Library)
+.\scripts\check.ps1     # everything CI runs; exit code = number of failed gates
 ```
 
-Backend coverage:
+| Gate | Result at release (2026-10-23) |
+|---|---|
+| ruff (lint + bandit security rules) | all checks passed |
+| mypy (types) | no issues in 67 source files |
+| pytest, real MySQL (`tycoons_test`) | **261 passed** |
+| pip-audit (runtime + dev) | no known vulnerabilities |
+| detect-secrets | clean (audited false positives are marked inline with `pragma: allowlist secret`) |
+| npm audit | 0 vulnerabilities |
+| vitest | **15 passed** |
+| vite build | ok |
 
-- Public content, availability and pricing
-- Booking holds, idempotency, overselling (including concurrency), expiry
+Backend coverage includes:
+
+- Pricing, availability, holds, idempotency, overselling (6 parallel checkouts on a 2-room suite → exactly 2), expiry
 - Payment verification: valid, invalid and mismatched signatures, amount mismatch, failed, authorised→capture, replay
-- Webhooks: bad signature, tampered body, duplicates, `order.paid`, late failure after capture, capture after lapse, unknown orders
-- Reconciliation and refunds
-- All forms, including CV type sniffing and size limits
-- Admin auth: cookies, CSRF, roles, logout revocation, last-admin protection, password policy
-- Rate limiting
-- The Alembic migration, which builds the test schema
+- Webhooks: bad signature, tampered body, duplicates, `order.paid`, late failure after capture, capture after lapse, unknown orders, external refunds, payload redaction
+- Refunds: amount confirmation, permission, no double refund, nothing-to-refund, failed refund changes nothing
+- Auth: Argon2id, bcrypt upgrade, idle/absolute expiry, per-session logout, CSRF bound to session, password reset, policy
+- Authorisation: generated from the live route table: every admin route declares a permission, refuses anonymous callers, and refuses staff outside their role
+- Audit log: written with each change, rolled back with failed changes, append-only in the database
+- Platform: `/api/v1` and legacy aliases, body-size limits, trusted hosts, error envelopes without internals, health, shared rate limiter, state machine, dashboard figures, migration downgrade/upgrade round trip
 
-Razorpay's network calls are faked; signature checks use the real SDK.
+Also verified in a real browser (Microsoft Edge via Playwright, not committed):
 
-**Not automated:** a payment through the real Razorpay test environment, which needs your test keys (see *Remaining items*).
+- **Public site is still pixel-identical** to `the-tycoons-hotel.html` on all 8 pages at 1440 px and 390 px.
+- End-to-end: forms, booking search, admin sign-in and audit trail, mobile admin navigation, no console errors.
+- **The production CSP** (`deploy/csp.txt`) loads every public and admin page with **0 violations**.
+
+**Not run:** a payment through Razorpay's test environment, because no test keys were provided (see *Remaining items*).
 
 ---
 
 ## Production deployment
 
+Step-by-step deploy, migration, rollback, backup and monitoring procedures are in **[docs/OPERATIONS.md](docs/OPERATIONS.md)**. The controls are described in **[docs/SECURITY.md](docs/SECURITY.md)**, and the audit that led to them in **[docs/AUDIT.md](docs/AUDIT.md)**.
+
+In short:
+
 1. **Server:** Ubuntu 22.04+ with Python 3.12, Node 20+ (build only), MySQL 8.4, nginx and certbot.
-2. **Database:**
-   ```sql
-   CREATE DATABASE tycoons CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-   CREATE USER 'tycoons'@'localhost' IDENTIFIED BY '<strong password>';
-   GRANT ALL ON tycoons.* TO 'tycoons'@'localhost';
-   ```
-3. **Backend** (`/srv/tycoons/backend`): create the venv, `pip install -r requirements.txt`, write `.env` with `ENVIRONMENT=production`, `COOKIE_SECURE=true`, a fresh `JWT_SECRET` and the live Razorpay keys, then run `alembic upgrade head`, `python -m app.cli seed` and `python -m app.cli create-admin …`. Install `deploy/tycoons-api.service`. The app refuses to start in production without these secrets.
-4. **Frontend:** run `npm ci && npm run build` and copy `frontend/dist` to `/srv/tycoons/frontend/dist`.
-5. **nginx:** install `deploy/nginx.conf` (adjust the domain), then `certbot --nginx`. It serves the site, proxies `/api` and `/media`, falls back to `index.html` for client routes, and sends HSTS.
-6. **Cron:** run `python -m app.cli reconcile` every 15 minutes, and back up MySQL plus `backend/storage/` daily (uploaded images; CVs live in `storage/private`, which is never web-served).
-
-**Secrets:** keep `.env` files out of Git (they are in `.gitignore`), readable only by the service user. Prefer the host's secret store if one is available, and rotate the JWT secret and Razorpay keys if a server is ever compromised.
-
-**Production notes:**
-
-- The rate limiter keeps its counters in process memory, so run **one uvicorn worker** per host (as in the unit file) or move the limiter to Redis before scaling out.
-- uvicorn trusts `X-Forwarded-For` only from nginx (`--forwarded-allow-ips`).
+2. **Database:** two accounts. The schema owner (`tycoons`, all rights on `tycoons.*`) is used only by Alembic. The runtime account (`tycoons_app`) gets DML per table and only `SELECT, INSERT` on `audit_logs`; the statements are in `scripts/mysql-grant-app-user.ps1`. Use `DATABASE_SSL_CA` if MySQL is on another host.
+3. **Backend:** create the venv and run `pip install -r requirements.txt`. Write `.env` with one `KEY=value` per line and comments on their own lines. Set at least `ENVIRONMENT=production`, `COOKIE_SECURE=true`, `ALLOWED_HOSTS`, `PUBLIC_BASE_URL=https://…` and the live Razorpay keys. The app refuses to start in production with unsafe settings. Then run `alembic upgrade head` as the owner, apply the grants, run `python -m app.cli seed` and `python -m app.cli create-admin …`, and install `deploy/tycoons-api.service` (2 workers, hardened unit).
+4. **Frontend:** `npm ci && npm run build`, then copy `frontend/dist` to `/srv/tycoons/frontend/dist`.
+5. **nginx:** `deploy/nginx.conf` sets HTTPS only, HSTS, the CSP, a host allowlist and the SPA fallback, and limits readiness checks to localhost.
+6. **Cron:** `python -m app.cli reconcile` every 15 minutes; nightly backups of MySQL and `backend/storage/`.
 
 ## API overview
 
-All endpoints sit under `/api`; Swagger at `/api/docs` has every schema. Errors share one shape:
+All endpoints are under **`/api/v1`**. Swagger at `/api/v1/docs` documents every schema. The pre-1.1 paths under `/api/...` still work but are hidden from the docs and answer with a `Deprecation: true` header.
+
+Errors share one shape. 4xx errors are business or validation problems, safe to show to users; 5xx errors are server faults and never contain internals:
 
 ```json
 {"error": {"code": "...", "message": "...", "details": [{"field": "...", "message": "..."}], "request_id": "..."}}
 ```
 
+Conventions: money is integer paise (INR); stay dates are hotel-local `YYYY-MM-DD` (Asia/Kolkata); timestamps are UTC ISO-8601; lists return `{items, total, limit, offset}`.
+
 | Public | |
 |---|---|
+| `GET /health/live`, `/health/ready` | liveness, readiness (DB + schema version) |
 | `GET /site`, `/rooms`, `/spa/treatments`, `/content/cards?section=`, `/gallery?category=&home=&limit=&offset=`, `/careers/openings` | content |
 | `GET /bookings/availability` | quote per room type for a stay |
 | `POST /bookings` (`Idempotency-Key` header) | hold a room, create the Razorpay order |
 | `POST /bookings/lookup`, `POST /bookings/{ref}/payment` | guest lookup, resume payment |
 | `POST /payments/verify`, `/payments/report`, `/payments/webhook` | payment callbacks |
 | `POST /dining/reservations`, `/spa/appointments`, `/enquiries/business`, `/enquiries/contact`, `/careers/applications`, `/newsletter` | forms |
-| **Admin** (cookie session + `X-CSRF-Token`) | `/admin/auth/*`, `/admin/dashboard`, `/admin/bookings`, `/admin/payments`, `/admin/room-types`, `/admin/spa-treatments`, `/admin/content-cards`, `/admin/gallery`, `/admin/job-openings`, `/admin/settings`, `/admin/submissions/*`, `/admin/uploads/image`, `/admin/users` |
+| **Admin** (session cookie + `X-CSRF-Token`) | `/admin/auth/*` (login, logout, me, change-password, password-reset), `/admin/dashboard`, `/admin/occupancy`, `/admin/bookings` (+ cancel, confirm), `/admin/payments` (+ reconcile), `/admin/room-types`, `/admin/spa-treatments`, `/admin/content-cards`, `/admin/gallery`, `/admin/job-openings`, `/admin/settings`, `/admin/submissions/*`, `/admin/uploads/image`, `/admin/users`, `/admin/audit-logs` |
 
-Roles: **admin** can do everything. **staff** can read bookings and payments and work guest requests. Every check is enforced in the API, not just hidden in the UI.
+Roles and permissions are listed in [docs/SECURITY.md](docs/SECURITY.md#roles).
 
 ## Remaining items
 
-- **Razorpay end-to-end in test mode has not been run:** no test keys were available. Signature verification, webhooks and every status transition are covered by automated tests against the real SDK verifier.
-- Real hotel data must replace the placeholders, sample rates and inventory.
-- Email confirmations need SMTP settings. Until then they are logged, not sent.
-- Staff password reset is done by an administrator (*Staff users → Reset password*). There is no self-service "forgot password" email, because no mail server is configured.
-- Terms & Conditions and Privacy Policy still link to Contact, as in the design. Pages for them need content from the hotel.
+- **Razorpay test mode end-to-end has not been run:** no test keys were available. Signature verification uses the real SDK, and every payment state transition is tested with a simulated gateway. Run one successful, one failed and one refunded test payment before going live.
+- **No independent security review yet.** The tests and scanners are evidence, not a guarantee; commission a penetration test before launch.
+- No MFA for staff (recommended next step: TOTP); guests use reference + email rather than accounts.
+- Real hotel data must replace the placeholders, sample rates and inventory. Set the **cancellation policy** in Site settings; it is shown at checkout and saved with each booking.
+- Emails (confirmations, password-reset links) need SMTP settings; until then they go to the application log.
+- Terms & Conditions and Privacy Policy still link to Contact, as in the design.
 - The hero "film slot" from the design is kept: add a `<source>` to the `<video>` in `HeroSlideshow.jsx`.
