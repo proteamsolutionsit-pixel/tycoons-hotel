@@ -23,6 +23,7 @@ from app.models.enums import AdminRole, BookingStatus, PaymentStatus
 from app.repositories.bookings import expire_stale_holds
 from app.seed import seed
 from app.services import payment_service
+from app.services.auth_service import revoke_all
 from app.services.razorpay_gateway import get_gateway
 
 
@@ -45,7 +46,7 @@ def cmd_create_admin(args) -> int:
             user.password_hash = hash_password(password)
             user.role = AdminRole(args.role)
             user.is_active = True
-            user.token_version += 1
+            revoke_all(db, user.id, "password_reset_cli")
             action = "Updated"
         else:
             db.add(AdminUser(email=email, full_name=args.name, role=AdminRole(args.role),
@@ -73,7 +74,8 @@ def cmd_reconcile(args) -> int:
         with SessionLocal() as db:
             try:
                 out = payment_service.reconcile(db, pid, gateway)
-                print(f"payment {pid}: {out.booking.reference} -> {out.booking.status.value} {out.notes}")
+                b = out.confirmed_booking
+                print(f"payment {pid}: {b.reference} -> {b.status.value} {out.notes}")
             except Exception as exc:  # keep going through the list
                 print(f"payment {pid}: failed ({exc})", file=sys.stderr)
     print(f"Checked {len(ids)} payment(s).")

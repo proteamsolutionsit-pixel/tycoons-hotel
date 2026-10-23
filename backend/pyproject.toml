@@ -1,0 +1,34 @@
+[tool.ruff]
+line-length = 145
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, bugbear, bandit (security), pyupgrade, simplify, imports
+select = ["E", "F", "B", "S", "UP", "SIM", "I"]
+ignore = [
+  "B008",   # FastAPI's Depends()/Query() in defaults is the framework's idiom
+  "S311",   # random is not used for security (secrets is)
+  "UP037",  # quoted annotations are needed for SQLAlchemy forward references
+  "SIM108",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S608", "B017"]
+"app/seed.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = false
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+filterwarnings = ["ignore::DeprecationWarning:starlette.*", "ignore::DeprecationWarning:fastapi.*"]

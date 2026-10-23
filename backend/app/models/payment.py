@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.timeutil import utcnow
@@ -20,6 +20,7 @@ class Payment(TimestampMixin, Base):
     final outcome. No card data is ever stored."""
 
     __tablename__ = "payments"
+    __table_args__ = (Index("ix_payments_status_captured_at", "status", "captured_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="RESTRICT"), index=True)
@@ -51,6 +52,7 @@ class PaymentEvent(Base):
     event_type: Mapped[str] = mapped_column(String(64))
     razorpay_order_id: Mapped[str | None] = mapped_column(String(64), index=True)
     razorpay_payment_id: Mapped[str | None] = mapped_column(String(64))
+    # Redacted summary only (ids, amounts, statuses) - never the customer details Razorpay sends
     payload: Mapped[Any] = mapped_column(JSON)
     result: Mapped[str | None] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)

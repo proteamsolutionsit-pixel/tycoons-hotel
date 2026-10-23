@@ -48,6 +48,26 @@ def overlapping_stays(db: Session, room_type_id: int, check_in: date, check_out:
     return [(r.check_in, r.check_out) for r in db.execute(stmt)]
 
 
+def overlapping_stays_by_room(db: Session, room_type_ids: list[int], check_in: date, check_out: date,
+                              now: datetime) -> dict[int, list[tuple[date, date]]]:
+    """Same as overlapping_stays for many room types in one query."""
+    out: dict[int, list[tuple[date, date]]] = {rid: [] for rid in room_type_ids}
+    if not room_type_ids:
+        return out
+    rows = db.execute(select(Booking.room_type_id, Booking.check_in, Booking.check_out).where(
+        Booking.room_type_id.in_(room_type_ids),
+        Booking.check_in < check_out,
+        Booking.check_out > check_in,
+        or_(
+            Booking.status.in_(_OCCUPYING),
+            and_(Booking.status == BookingStatus.PENDING_PAYMENT, Booking.hold_expires_at > now),
+        ),
+    ))
+    for rid, ci, co in rows:
+        out[rid].append((ci, co))
+    return out
+
+
 def expire_stale_holds(db: Session, now: datetime, room_type_id: int | None = None) -> int:
     """Mark pending bookings whose hold has lapsed as expired. A capture that
     arrives later is still honoured if a room is free (see payment_service)."""
@@ -59,7 +79,7 @@ def expire_stale_holds(db: Session, now: datetime, room_type_id: int | None = No
     )
     if room_type_id is not None:
         stmt = stmt.where(Booking.room_type_id == room_type_id)
-    return db.execute(stmt).rowcount or 0
+    return getattr(db.execute(stmt), "rowcount", 0) or 0
 
 
 def latest_payment(booking: Booking) -> Payment | None:

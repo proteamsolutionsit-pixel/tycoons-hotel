@@ -20,18 +20,25 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.errors import AppError, Conflict, NotFound, UpstreamError
 from app.core.timeutil import utcnow
+from app.domain.states import move_booking
 from app.models import Booking, Payment, RoomType
 from app.models.enums import BookingStatus, PaymentStatus
 from app.repositories import bookings as booking_repo
 from app.repositories import settings as settings_repo
-from app.schemas.booking import (AvailabilityResult, BookingCreate, BookingPublic, CheckoutConfig,
-                                 CheckoutPrefill, RoomQuote)
+from app.schemas.booking import (
+    AvailabilityResult,
+    BookingCreate,
+    BookingPublic,
+    CheckoutConfig,
+    CheckoutPrefill,
+    RoomQuote,
+)
 from app.services import availability
 from app.services.razorpay_gateway import GatewayError, PaymentGateway
 
 log = logging.getLogger("app.booking")
 
-_REF_ALPHABET = "ABCDEFGHJKMNPQRSTVWXYZ23456789"  # no 0/O, 1/I/L, U
+_REF_ALPHABET = "ABCDEFGHJKMNPQRSTVWXYZ23456789"  # no 0/O, 1/I/L, U  # pragma: allowlist secret
 
 
 def new_reference() -> str:
@@ -48,6 +55,7 @@ def to_public(b: Booking) -> BookingPublic:
         subtotal_paise=b.subtotal_paise, tax_percent=b.tax_percent, tax_paise=b.tax_paise,
         total_paise=b.total_paise, currency=b.currency, hold_expires_at=b.hold_expires_at,
         confirmed_at=b.confirmed_at, payment_status=p.status if p else None, created_at=b.created_at,
+        cancellation_policy=b.cancellation_policy,
     )
 
 
@@ -60,9 +68,10 @@ def search(db: Session, check_in: date, check_out: date, adults: int, children: 
     currency = get_settings().currency
     rooms = db.execute(select(RoomType).where(RoomType.is_active.is_(True))
                        .order_by(RoomType.sort_order, RoomType.id)).scalars().all()
+    stays = booking_repo.overlapping_stays_by_room(db, [r.id for r in rooms], check_in, check_out, now)
     quotes = []
     for room in rooms:
-        free = availability.available_rooms(db, room, check_in, check_out, now)
+        free = max(0, room.total_rooms - availability.peak_occupancy(stays[room.id], check_in, check_out))
         fits = availability.fits_party(room, adults, children)
         q = availability.quote(room, nights, tax)
         quotes.append(RoomQuote(
@@ -127,16 +136,20 @@ def create_booking(db: Session, data: BookingCreate, idempotency_key: str | None
         nightly_rate_paise=q.nightly_rate_paise, subtotal_paise=q.subtotal_paise, tax_percent=q.tax_percent,
         tax_paise=q.tax_paise, total_paise=q.total_paise, currency=s.currency,
         status=BookingStatus.PENDING_PAYMENT, hold_expires_at=now + timedelta(minutes=s.booking_hold_minutes),
+        # What the guest agreed to, as shown to them at booking time
+        terms_version=str(settings_repo.get_value(db, "booking_terms_version", "") or "")[:32] or None,
+        terms_accepted_at=now,
+        cancellation_policy=str(settings_repo.get_value(db, "cancellation_policy", "") or "") or None,
     )
     db.add(booking)
     try:
         db.commit()  # hold acquired; lock released
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
         # Same idempotency key raced us, or (astronomically unlikely) a reference clash
         if idempotency_key and (existing := booking_repo.get_by_idempotency_key(db, idempotency_key)):
             return existing, ensure_order(db, existing, gateway)
-        raise Conflict("Please try again.", code="retry")
+        raise Conflict("Please try again.", code="retry") from exc
     db.refresh(booking)
     log.info("Booking held", extra={"booking": booking.reference, "room": room.slug, "total_paise": q.total_paise})
 
@@ -145,7 +158,7 @@ def create_booking(db: Session, data: BookingCreate, idempotency_key: str | None
     except UpstreamError:
         # No order, so no way to pay: release the room immediately.
         booking = booking_repo.lock(db, booking.id)
-        booking.status = BookingStatus.CANCELLED
+        move_booking(booking, BookingStatus.CANCELLED)
         booking.cancelled_at = utcnow()
         booking.cancel_reason = "Payment order could not be created"
         booking.hold_expires_at = None

@@ -28,8 +28,8 @@ TEST_DB = os.environ.get("TEST_DATABASE_URL") or _env.get("TEST_DATABASE_URL")
 if not TEST_DB:
     raise RuntimeError("Set TEST_DATABASE_URL (see backend/.env.example)")
 
-KEY_SECRET = "test_key_secret_123"
-WEBHOOK_SECRET = "test_webhook_secret_456"
+KEY_SECRET = "test_key_secret_123"  # pragma: allowlist secret
+WEBHOOK_SECRET = "test_webhook_secret_456"  # pragma: allowlist secret
 os.environ.update({
     "ENVIRONMENT": "test",
     "DATABASE_URL": TEST_DB,
@@ -37,17 +37,18 @@ os.environ.update({
     "RAZORPAY_KEY_SECRET": KEY_SECRET,
     "RAZORPAY_WEBHOOK_SECRET": WEBHOOK_SECRET,
     "RATE_LIMIT_ENABLED": "false",
+    "RATE_LIMIT_BACKEND": "database",
     "LOG_JSON": "false",
     "LOG_LEVEL": "WARNING",
     "STORAGE_DIR": str(BACKEND / ".pytest-storage"),
     "SMTP_HOST": "",
 })
 
-from alembic import command  # noqa: E402
-from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+from alembic import command  # noqa: E402
+from alembic.config import Config  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.core.rate_limit import limiter  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
@@ -139,11 +140,15 @@ class FakeGateway(RazorpayGateway):
                       "Content-Type": "application/json"}
 
 
-def _alembic_upgrade() -> None:
+def _alembic_config() -> Config:
     cfg = Config(str(BACKEND / "alembic.ini"))
     cfg.set_main_option("script_location", str(BACKEND / "alembic"))
     cfg.cmd_opts = type("o", (), {"x": [f"url={TEST_DB}"]})()
-    command.upgrade(cfg, "head")
+    return cfg
+
+
+def _alembic_upgrade() -> None:
+    command.upgrade(_alembic_config(), "head")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -198,7 +203,7 @@ def db():
 
 
 def login(client: TestClient, email: str = "admin@tycoons.example.com", password: str = ADMIN_PW) -> dict:
-    r = client.post("/api/admin/auth/login", json={"email": email, "password": password})
+    r = client.post("/api/v1/admin/auth/login", json={"email": email, "password": password})
     assert r.status_code == 200, r.text
     return {"X-CSRF-Token": client.cookies.get("tyc_csrf")}
 
@@ -222,7 +227,7 @@ def booking_payload(room: str = "premium-room", days_ahead: int = 10, nights: in
 
 
 def create_booking(client: TestClient, **kw) -> dict:
-    r = client.post("/api/bookings", json=booking_payload(**kw))
+    r = client.post("/api/v1/bookings", json=booking_payload(**kw))
     assert r.status_code == 201, r.text
     return r.json()
 

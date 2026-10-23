@@ -1,4 +1,7 @@
-"""Application settings, read from environment variables (and backend/.env)."""
+"""Application settings, read from environment variables (and backend/.env).
+
+Keep .env values on their own lines: `KEY=value`, with comments on separate
+lines. systemd's EnvironmentFile does not strip trailing `# comments`."""
 from __future__ import annotations
 
 from functools import lru_cache
@@ -24,21 +27,33 @@ class Settings(BaseSettings):
     log_json: bool = True
 
     # Database ---------------------------------------------------------------
-    database_url: str = "mysql+pymysql://tycoons:change-me@127.0.0.1:3308/tycoons?charset=utf8mb4"
+    # Runtime account: DML only (see scripts/mysql-grant-app-user.ps1).
+    database_url: str = "mysql+pymysql://tycoons_app:change-me@127.0.0.1:3308/tycoons?charset=utf8mb4"  # pragma: allowlist secret
+    # Schema owner used by Alembic only. Falls back to DATABASE_URL.
+    migration_database_url: str = ""
     database_echo: bool = False
+    database_pool_size: int = 10
+    database_max_overflow: int = 10
+    database_pool_timeout: int = 10        # seconds to wait for a free connection
+    database_connect_timeout: int = 10
+    database_read_timeout: int = 30        # per query, seconds
+    database_ssl_ca: str = ""              # path to CA bundle -> TLS to MySQL
 
     # HTTP -------------------------------------------------------------------
-    # Comma-separated list of origins allowed to call the API from a browser.
     cors_origins: str = "http://localhost:5173"
-    # Serve the built React app (frontend/dist) from FastAPI. Optional; nginx
-    # can do this instead in production.
+    # Host headers accepted (comma-separated). "*" disables the check (dev only).
+    allowed_hosts: str = "localhost,127.0.0.1,testserver"
+    public_base_url: str = "http://localhost:5173"   # used in emailed links
+    max_json_body_bytes: int = 1 * 1024 * 1024
+    max_upload_body_bytes: int = 9 * 1024 * 1024
     frontend_dist: Path | None = None
 
-    # Admin auth -------------------------------------------------------------
-    jwt_secret: str = ""
-    jwt_expire_minutes: int = 480
+    # Staff sessions -----------------------------------------------------------
+    session_idle_minutes: int = 30
+    session_absolute_hours: int = 12
     cookie_secure: bool = False
     cookie_samesite: Literal["lax", "strict"] = "lax"
+    password_reset_minutes: int = 30
 
     # Razorpay ---------------------------------------------------------------
     razorpay_key_id: str = ""
@@ -71,6 +86,8 @@ class Settings(BaseSettings):
 
     # Rate limiting ----------------------------------------------------------
     rate_limit_enabled: bool = True
+    # "database": shared by all workers/hosts (production). "memory": per process.
+    rate_limit_backend: Literal["database", "memory"] = "database"
 
     @field_validator("storage_dir", mode="after")
     @classmethod
@@ -78,17 +95,24 @@ class Settings(BaseSettings):
         return v if v.is_absolute() else (BACKEND_DIR / v).resolve()
 
     @model_validator(mode="after")
-    def _check_secrets(self) -> "Settings":
-        if self.environment == "production":
-            if len(self.jwt_secret) < 32:
-                raise ValueError("JWT_SECRET must be at least 32 characters in production")
-            if not (self.razorpay_key_id and self.razorpay_key_secret and self.razorpay_webhook_secret):
-                raise ValueError("Razorpay keys and webhook secret are required in production")
-            if not self.cookie_secure:
-                raise ValueError("COOKIE_SECURE must be true in production (serve over HTTPS)")
-        elif not self.jwt_secret:
-            # Development convenience only; production refuses to start without one.
-            self.jwt_secret = "dev-only-insecure-secret-change-me-0123456789"
+    def _check_production(self) -> "Settings":
+        if self.environment != "production":
+            return self
+        problems = []
+        if not (self.razorpay_key_id and self.razorpay_key_secret and self.razorpay_webhook_secret):
+            problems.append("RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are required")
+        if not self.cookie_secure:
+            problems.append("COOKIE_SECURE must be true (serve over HTTPS)")
+        if "*" in self.allowed_host_list:
+            problems.append("ALLOWED_HOSTS must list the real host names")
+        if "*" in self.cors_origin_list:
+            problems.append("CORS_ORIGINS must not be *")
+        if not self.public_base_url.startswith("https://"):
+            problems.append("PUBLIC_BASE_URL must be https://")
+        if self.rate_limit_backend != "database":
+            problems.append("RATE_LIMIT_BACKEND must be database")
+        if problems:
+            raise ValueError("Unsafe production configuration: " + "; ".join(problems))
         return self
 
     @property
@@ -96,8 +120,16 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
+    def allowed_host_list(self) -> list[str]:
+        return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
+
+    @property
     def razorpay_configured(self) -> bool:
         return bool(self.razorpay_key_id and self.razorpay_key_secret)
+
+    @property
+    def migration_url(self) -> str:
+        return self.migration_database_url or self.database_url
 
 
 @lru_cache

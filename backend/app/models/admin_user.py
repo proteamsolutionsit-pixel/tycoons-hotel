@@ -18,6 +18,7 @@ class AdminUser(TimestampMixin, Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[AdminRole] = mapped_column(enum_col(AdminRole, 16), default=AdminRole.STAFF)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    # Bumped on logout / password change; tokens carrying an older value are refused.
+    # Legacy (JWT sessions, replaced by admin_sessions in 1.1). Kept so the
+    # migration stays additive; no longer read.
     token_version: Mapped[int] = mapped_column(Integer, default=0)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime)

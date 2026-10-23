@@ -4,8 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import (CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric,
-                        String, Text)
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, enum_col
@@ -25,6 +24,9 @@ class Booking(TimestampMixin, Base):
         CheckConstraint("total_paise >= 0", name="total_non_negative"),
         # Availability lookups: overlapping stays of one room type in a live status
         Index("ix_bookings_availability", "room_type_id", "status", "check_in", "check_out"),
+        # Admin lists / reports
+        Index("ix_bookings_created_at", "created_at"),
+        Index("ix_bookings_status_check_in", "status", "check_in"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -57,6 +59,11 @@ class Booking(TimestampMixin, Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime)
     cancel_reason: Mapped[str | None] = mapped_column(String(255))
+
+    # What the guest agreed to when booking (nullable: rows created before this was recorded)
+    terms_version: Mapped[str | None] = mapped_column(String(32))
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime)
+    cancellation_policy: Mapped[str | None] = mapped_column(Text)
 
     room_type: Mapped["RoomType"] = relationship(lazy="joined")
     payments: Mapped[list["Payment"]] = relationship(back_populates="booking", order_by="Payment.id")

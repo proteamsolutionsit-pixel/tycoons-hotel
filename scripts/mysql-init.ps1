@@ -22,7 +22,7 @@ if (-not (Test-Path "$bin\mysqld.exe")) { throw "MySQL not found at $bin. See RE
 if (Test-Path $data) { throw "$data already exists - MySQL is already initialised." }
 
 function New-Secret([int]$len = 24) {
-  $chars = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'.ToCharArray()
+  $chars = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'.ToCharArray()  # pragma: allowlist secret
   $bytes = New-Object byte[] $len
   [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
   -join ($bytes | ForEach-Object { $chars[$_ % $chars.Length] })
@@ -45,7 +45,7 @@ GRANT ALL PRIVILEGES ON tycoons.* TO 'tycoons'@'127.0.0.1', 'tycoons'@'localhost
 GRANT ALL PRIVILEGES ON tycoons_test.* TO 'tycoons'@'127.0.0.1', 'tycoons'@'localhost';
 FLUSH PRIVILEGES;
 "@
-$sql | & "$bin\mysql.exe" -h127.0.0.1 -P3308 -uroot
+$sql | & "$bin\mysql.exe" --host=127.0.0.1 --port=3308 -uroot
 if ($LASTEXITCODE -ne 0) { throw "Creating databases failed" }
 
 Set-Content -Path (Join-Path $root '.tools\mysql-root-password.txt') -Value $rootPw -Encoding ascii

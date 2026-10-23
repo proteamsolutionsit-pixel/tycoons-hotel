@@ -107,6 +107,7 @@ class BookingPublic(ORMModel):
     confirmed_at: datetime | None
     payment_status: PaymentStatus | None
     created_at: datetime
+    cancellation_policy: str | None = None
 
 
 class BookingCheckout(BaseModel):

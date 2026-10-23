@@ -18,7 +18,8 @@ target_metadata = Base.metadata
 
 def _url() -> str:
     # `alembic -x url=...` overrides DATABASE_URL (used by the test suite)
-    return context.get_x_argument(as_dictionary=True).get("url") or get_settings().database_url
+    # MIGRATION_DATABASE_URL (schema owner) when set; the runtime account has DML rights only.
+    return context.get_x_argument(as_dictionary=True).get("url") or get_settings().migration_url
 
 
 def run_migrations_offline() -> None:

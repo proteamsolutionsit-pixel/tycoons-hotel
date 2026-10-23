@@ -49,7 +49,7 @@ python -m venv .venv
 # edit backend\.env: JWT_SECRET and the Razorpay test keys (see below)
 .\.venv\Scripts\alembic upgrade head
 .\.venv\Scripts\python -m app.cli seed
-$env:ADMIN_PASSWORD = 'Choose-A-Strong-Pass1'
+$env:ADMIN_PASSWORD = 'Choose-A-Strong-Pass1'  # pragma: allowlist secret
 .\.venv\Scripts\python -m app.cli create-admin --email you@yourhotel.com --name "Your Name"
 Remove-Item Env:ADMIN_PASSWORD
 
@@ -80,7 +80,7 @@ Stop the database with `.\scripts\mysql-stop.ps1`.
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | `mysql+pymysql://user:pass@host:port/tycoons?charset=utf8mb4` |
+| `DATABASE_URL` | `mysql+pymysql://user:pass@host:port/tycoons?charset=utf8mb4` | <!-- pragma: allowlist secret -->
 | `TEST_DATABASE_URL` | used only by pytest; its tables are dropped and recreated |
 | `JWT_SECRET` | signs staff sessions. Use 32+ random characters (required in production) |
 | `COOKIE_SECURE` | `true` behind HTTPS (required in production) |

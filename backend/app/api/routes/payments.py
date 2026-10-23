@@ -32,7 +32,7 @@ def verify(data: PaymentVerify, request: Request, background: BackgroundTasks, d
            gateway: PaymentGateway | None = Depends(get_gateway)):
     enforce(request, "payment-verify", 30, 600)
     out = payment_service.verify_checkout(db, data, gateway)
-    b = out.booking
+    b = out.confirmed_booking
     if out.newly_confirmed:
         notifications.booking_confirmed(background, b)
     if out.needs_review:
@@ -55,9 +55,10 @@ async def webhook(request: Request, background: BackgroundTasks, db: Session = D
                   x_razorpay_signature: str = Header(default=""),
                   x_razorpay_event_id: str | None = Header(default=None)):
     # The signature covers the exact bytes Razorpay sent, so read the raw body.
+    await run_in_threadpool(enforce, request, "webhook", 600, 60)
     raw = await request.body()
     out = await run_in_threadpool(payment_service.handle_webhook, db, raw, x_razorpay_signature,
-                                  x_razorpay_event_id, gateway)
+                                  x_razorpay_event_id, gateway, request)
     if out.booking is not None:
         if out.newly_confirmed:
             notifications.booking_confirmed(background, out.booking)

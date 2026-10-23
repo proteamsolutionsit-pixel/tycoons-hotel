@@ -1,15 +1,19 @@
-fastapi==0.115.12
-uvicorn[standard]==0.34.2
-SQLAlchemy==2.0.40
-PyMySQL==1.1.1
-cryptography==44.0.3
-alembic==1.15.2
-pydantic==2.11.4
-pydantic-settings==2.9.1
-email-validator==2.2.0
-python-multipart==0.0.20
-razorpay==1.4.2
-setuptools==80.9.0
-bcrypt==4.3.0
-PyJWT==2.10.1
-tzdata==2025.2
+# Runtime dependencies (pinned; audited with `pip-audit -r requirements.txt`)
+fastapi==0.161.1
+starlette==1.9.0
+uvicorn[standard]==0.54.0
+SQLAlchemy==2.0.55
+PyMySQL==1.2.3
+cryptography==50.0.2
+alembic==1.20.1
+pydantic==2.14.1
+pydantic-settings==2.16.1
+email-validator==2.3.0
+python-multipart==0.0.32
+razorpay==2.0.1
+# razorpay still imports pkg_resources, which ships with setuptools
+setuptools==84.2.1
+argon2-cffi==25.1.0
+# only to verify (and upgrade) password hashes created before the move to Argon2id
+bcrypt==5.0.0
+tzdata==2026.5

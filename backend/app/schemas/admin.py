@@ -5,11 +5,27 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.models.enums import (AdminRole, BookingStatus, CardSection, EnquiryKind, GalleryCategory, GalleryLayout,
-                              GuestType, PaymentStatus, SubmissionStatus)
+from app.models.enums import (
+    AdminRole,
+    BookingStatus,
+    CardSection,
+    EnquiryKind,
+    GalleryCategory,
+    GalleryLayout,
+    GuestType,
+    PaymentStatus,
+    SubmissionStatus,
+)
 from app.schemas.common import ORMModel
+
+
+class StrictInput(BaseModel):
+    """Admin request bodies: unknown fields are rejected (no mass assignment)."""
+
+    model_config = ConfigDict(extra="forbid")
+
 
 _SLUG = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 # Image URLs: site assets (/assets/...), uploads (/media/...) or https.
@@ -18,7 +34,7 @@ _IMAGE_URL = r"^(/assets/|/media/|https://)[^\s<>\"']{1,490}$"
 
 # -- Auth / users ------------------------------------------------------------
 
-class LoginIn(BaseModel):
+class LoginIn(StrictInput):
     email: EmailStr
     password: str = Field(min_length=1, max_length=200)
 
@@ -33,26 +49,30 @@ class AdminUserOut(ORMModel):
     created_at: datetime
 
 
-class AdminUserCreate(BaseModel):
+class MeOut(AdminUserOut):
+    permissions: list[str] = []
+
+
+class AdminUserCreate(StrictInput):
     email: EmailStr
     full_name: str = Field(min_length=2, max_length=120)
     role: AdminRole = AdminRole.STAFF
-    password: str = Field(min_length=12, max_length=72)
+    password: str = Field(min_length=12, max_length=128)
 
 
-class AdminUserUpdate(BaseModel):
+class AdminUserUpdate(StrictInput):
     full_name: str | None = Field(default=None, min_length=2, max_length=120)
     role: AdminRole | None = None
     is_active: bool | None = None
 
 
-class PasswordChange(BaseModel):
+class PasswordChange(StrictInput):
     current_password: str = Field(min_length=1, max_length=200)
-    new_password: str = Field(min_length=12, max_length=72)
+    new_password: str = Field(min_length=12, max_length=128)
 
 
-class PasswordReset(BaseModel):
-    new_password: str = Field(min_length=12, max_length=72)
+class PasswordReset(StrictInput):
+    new_password: str = Field(min_length=12, max_length=128)
 
 
 # -- Bookings / payments ---------------------------------------------------
@@ -118,18 +138,57 @@ class BookingDetail(BookingRow):
     confirmed_at: datetime | None
     cancelled_at: datetime | None
     cancel_reason: str | None
+    terms_version: str | None
+    terms_accepted_at: datetime | None
+    cancellation_policy: str | None
     payments: list[PaymentOut]
     events: list[PaymentEventOut]
 
 
-class CancelIn(BaseModel):
+class CancelIn(StrictInput):
     reason: str = Field(min_length=3, max_length=255)
     refund: bool = False
+    # Required with refund=true: must equal the captured amount. Guards against
+    # refunding the wrong booking from a stale screen.
+    confirm_refund_paise: int | None = Field(default=None, ge=1)
+
+
+class ConfirmReviewIn(StrictInput):
+    note: str = Field(min_length=3, max_length=255)
+
+
+class AuditLogOut(ORMModel):
+    id: int
+    occurred_at: datetime
+    actor_type: str
+    actor_id: int | None
+    actor_email: str | None
+    action: str
+    resource_type: str | None
+    resource_id: str | None
+    outcome: str
+    ip: str | None
+    request_id: str | None
+    details: Any | None
+
+
+class OccupancyRoom(BaseModel):
+    slug: str
+    name: str
+    total_rooms: int
+    booked: list[int]       # per day: confirmed + payment review
+    held: list[int]         # per day: unpaid holds still active
+
+
+class Occupancy(BaseModel):
+    start: date
+    days: list[date]
+    rooms: list[OccupancyRoom]
 
 
 # -- Catalogue / content ---------------------------------------------------
 
-class RoomTypeBase(BaseModel):
+class RoomTypeBase(StrictInput):
     name: str = Field(min_length=2, max_length=120)
     summary: str = Field(min_length=1, max_length=500)
     description: str = Field(min_length=1, max_length=4000)
@@ -152,7 +211,7 @@ class RoomTypeCreate(RoomTypeBase):
     slug: str = Field(min_length=2, max_length=60, pattern=_SLUG)
 
 
-class RoomTypeUpdate(BaseModel):
+class RoomTypeUpdate(StrictInput):
     name: str | None = Field(default=None, min_length=2, max_length=120)
     summary: str | None = Field(default=None, min_length=1, max_length=500)
     description: str | None = Field(default=None, min_length=1, max_length=4000)
@@ -176,7 +235,7 @@ class RoomTypeOut(RoomTypeCreate, ORMModel):
     updated_at: datetime
 
 
-class SpaTreatmentCreate(BaseModel):
+class SpaTreatmentCreate(StrictInput):
     slug: str = Field(min_length=2, max_length=60, pattern=_SLUG)
     name: str = Field(min_length=2, max_length=120)
     form_label: str = Field(min_length=2, max_length=120)
@@ -189,7 +248,7 @@ class SpaTreatmentCreate(BaseModel):
     is_active: bool = True
 
 
-class SpaTreatmentUpdate(BaseModel):
+class SpaTreatmentUpdate(StrictInput):
     slug: str | None = Field(default=None, min_length=2, max_length=60, pattern=_SLUG)
     name: str | None = Field(default=None, min_length=2, max_length=120)
     form_label: str | None = Field(default=None, min_length=2, max_length=120)
@@ -206,7 +265,7 @@ class SpaTreatmentOut(SpaTreatmentCreate, ORMModel):
     id: int
 
 
-class ContentCardCreate(BaseModel):
+class ContentCardCreate(StrictInput):
     section: CardSection
     title: str = Field(min_length=1, max_length=160)
     body: str = Field(min_length=1, max_length=2000)
@@ -217,7 +276,7 @@ class ContentCardCreate(BaseModel):
     is_active: bool = True
 
 
-class ContentCardUpdate(BaseModel):
+class ContentCardUpdate(StrictInput):
     section: CardSection | None = None
     title: str | None = Field(default=None, min_length=1, max_length=160)
     body: str | None = Field(default=None, min_length=1, max_length=2000)
@@ -232,7 +291,7 @@ class ContentCardOut(ContentCardCreate, ORMModel):
     id: int
 
 
-class GalleryImageCreate(BaseModel):
+class GalleryImageCreate(StrictInput):
     image_url: str = Field(pattern=_IMAGE_URL)
     alt: str = Field(min_length=1, max_length=200)
     category: GalleryCategory
@@ -245,7 +304,7 @@ class GalleryImageCreate(BaseModel):
     is_active: bool = True
 
 
-class GalleryImageUpdate(BaseModel):
+class GalleryImageUpdate(StrictInput):
     image_url: str | None = Field(default=None, pattern=_IMAGE_URL)
     alt: str | None = Field(default=None, min_length=1, max_length=200)
     category: GalleryCategory | None = None
@@ -262,7 +321,7 @@ class GalleryImageOut(GalleryImageCreate, ORMModel):
     id: int
 
 
-class JobOpeningCreate(BaseModel):
+class JobOpeningCreate(StrictInput):
     title: str = Field(min_length=2, max_length=160)
     department: str = Field(min_length=1, max_length=120)
     employment_type: str = Field(min_length=1, max_length=60)
@@ -271,7 +330,7 @@ class JobOpeningCreate(BaseModel):
     is_active: bool = True
 
 
-class JobOpeningUpdate(BaseModel):
+class JobOpeningUpdate(StrictInput):
     title: str | None = Field(default=None, min_length=2, max_length=160)
     department: str | None = Field(default=None, min_length=1, max_length=120)
     employment_type: str | None = Field(default=None, min_length=1, max_length=60)
@@ -293,7 +352,7 @@ class SettingOut(ORMModel):
     updated_at: datetime
 
 
-class SettingUpdate(BaseModel):
+class SettingUpdate(StrictInput):
     value: Any
 
     @field_validator("value")
@@ -307,7 +366,7 @@ class SettingUpdate(BaseModel):
 
 # -- Submissions -----------------------------------------------------------
 
-class SubmissionUpdate(BaseModel):
+class SubmissionUpdate(StrictInput):
     status: SubmissionStatus | None = None
     staff_notes: str | None = Field(default=None, max_length=4000)
 
@@ -373,19 +432,25 @@ class NewsletterOut(ORMModel):
     created_at: datetime
 
 
-class NewsletterUpdate(BaseModel):
+class NewsletterUpdate(StrictInput):
     is_active: bool
 
 
 class Dashboard(BaseModel):
     arrivals_today: int
+    departures_today: int
     arrivals_next_7_days: int
     in_house_tonight: int
+    rooms_total: int
+    rooms_sold_tonight: int
+    occupancy_tonight_pct: float
     pending_payment: int
     payment_review: int
     revenue_30d_paise: int
+    refunded_30d_paise: int
     confirmed_30d: int
     new_submissions: dict[str, int]
+    alerts: dict[str, int]   # payment discrepancies / security signals, all counts
 
 
 class UploadOut(BaseModel):
