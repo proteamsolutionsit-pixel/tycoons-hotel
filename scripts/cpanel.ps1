@@ -88,11 +88,18 @@ function Send-CpFile([string]$localPath, [string]$remoteDir) {
   $c = New-CpClient
   try {
     $form = New-Object System.Net.Http.MultipartFormDataContent
-    $form.Add((New-Object System.Net.Http.StringContent($remoteDir)), 'dir')
-    $form.Add((New-Object System.Net.Http.StringContent('1')), 'overwrite')
+    # Field names must be quoted for cPanel's parser; unquoted, "dir" is ignored and files land in ~/
+    $form.Add((New-Object System.Net.Http.StringContent($remoteDir)), '"dir"')
+    $form.Add((New-Object System.Net.Http.StringContent('1')), '"overwrite"')
     $bytes = [IO.File]::ReadAllBytes($localPath)
     $file = New-Object System.Net.Http.ByteArrayContent(, $bytes)
-    $form.Add($file, 'file-1', [IO.Path]::GetFileName($localPath))
+    # cPanel's parser needs quoted name/filename and no RFC 5987 filename* (which .NET adds by default)
+    $file.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse('application/octet-stream')
+    $cd = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue('form-data')
+    $cd.Name = '"file-1"'
+    $cd.FileName = '"' + [IO.Path]::GetFileName($localPath) + '"'
+    $file.Headers.ContentDisposition = $cd
+    $form.Add($file)
     $r = Read-CpResponse ($c.PostAsync("https://$($script:CpHost):2083/execute/Fileman/upload_files", $form).GetAwaiter().GetResult())
   } finally { $c.Dispose() }
   if ($r.status -ne 1 -or $r.data.failed -gt 0) { throw "upload failed: $(($r.errors) -join '; ') $($r.data.uploads | ConvertTo-Json -Compress)" }

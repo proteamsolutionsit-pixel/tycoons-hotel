@@ -6,7 +6,7 @@ reservation dates) are plain DATEs in the hotel's timezone.
 """
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
 from app.core.config import get_settings
@@ -14,7 +14,7 @@ from app.core.config import get_settings
 
 def utcnow() -> datetime:
     """Naive UTC 'now', matching how DATETIME columns are stored."""
-    return datetime.now(UTC).replace(tzinfo=None)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def hotel_tz() -> ZoneInfo:
@@ -28,4 +28,4 @@ def hotel_today() -> date:
 def to_aware_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
-    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt

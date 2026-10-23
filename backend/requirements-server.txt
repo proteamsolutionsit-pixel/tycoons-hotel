@@ -1,13 +1,16 @@
 # Runtime for cPanel/Passenger hosting (no uvicorn: Passenger serves the app via a2wsgi).
 # Keep versions identical to requirements.txt.
 fastapi==0.161.1
-starlette==1.9.0
+# Starlette 1.8+ and pydantic-settings 2.16+ need Python 3.11; older lines are for hosts still on 3.10
+starlette==1.9.0; python_version >= "3.11"
+starlette==1.7.0; python_version < "3.11"
 SQLAlchemy==2.0.55
 PyMySQL==1.2.3
 cryptography==50.0.2
 alembic==1.20.1
 pydantic==2.14.1
-pydantic-settings==2.16.1
+pydantic-settings==2.16.1; python_version >= "3.11"
+pydantic-settings==2.15.0; python_version < "3.11"
 email-validator==2.3.0
 python-multipart==0.0.32
 razorpay==2.0.1

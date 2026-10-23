@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 _RESERVED = set(vars(logging.makeLogRecord({})).keys()) | {"message", "asctime"}
 _SENSITIVE_KEY = re.compile(r"pass|secret|token|signature|authorization|cookie|card|cvv|otp|api_key", re.I)
@@ -36,7 +36,7 @@ def _redact(value, key: str = "", depth: int = 0):
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload = {
-            "ts": datetime.fromtimestamp(record.created, UTC).isoformat(timespec="milliseconds"),
+            "ts": datetime.fromtimestamp(record.created, timezone.utc).isoformat(timespec="milliseconds"),
             "level": record.levelname,
             "logger": record.name,
             "msg": redact_text(record.getMessage()),
