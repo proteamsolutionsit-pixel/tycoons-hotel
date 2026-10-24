@@ -20,7 +20,7 @@ Pop-Location
 $be = Join-Path $root 'backend'
 Copy-Item -Recurse (Join-Path $be 'app') (Join-Path $stage 'app')
 Copy-Item -Recurse (Join-Path $be 'alembic') (Join-Path $stage 'alembic')
-foreach ($f in 'alembic.ini', 'passenger_wsgi.py', 'requirements-server.txt') { Copy-Item (Join-Path $be $f) $stage }
+foreach ($f in 'alembic.ini', 'passenger_wsgi.py', 'migrate.py', 'requirements-server.txt') { Copy-Item (Join-Path $be $f) $stage }
 Copy-Item -Recurse (Join-Path $root 'frontend\dist') (Join-Path $stage 'frontend_dist')
 Get-ChildItem $stage -Recurse -Directory -Filter '__pycache__' | Remove-Item -Recurse -Force
 Get-ChildItem $stage -Recurse -File -Include '*.pyc', '.env', '*.prebak' | Remove-Item -Force
