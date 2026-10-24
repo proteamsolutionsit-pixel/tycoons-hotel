@@ -93,6 +93,7 @@ Stop the database with `.\scripts\mysql-stop.ps1`.
 | `CORS_ORIGINS` | comma-separated browser origins. Not needed when the site and API share an origin |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | API keys. Only the key **id** ever reaches the browser |
 | `RAZORPAY_WEBHOOK_SECRET` | the secret you type when creating the webhook |
+| `SETTINGS_ENCRYPTION_KEY` | optional Fernet key for secrets entered in *Admin → Payment gateway*; otherwise a key file is created under `STORAGE_DIR/private/` |
 | `BOOKING_HOLD_MINUTES` | how long a room is held while the guest pays (default 15) |
 | `HOTEL_TIMEZONE` | `Asia/Kolkata`. Booking dates are hotel-local; timestamps are stored in UTC |
 | `SMTP_*`, `HOTEL_NOTIFY_EMAIL` | optional. Without `SMTP_HOST`, mail is written to the log instead of sent |
@@ -103,6 +104,20 @@ Stop the database with `.\scripts\mysql-stop.ps1`.
 ---
 
 ## Razorpay
+
+### From the admin (recommended)
+
+*Admin → Payment gateway* (admin role only) sets the payment mode and the Razorpay keys without editing files or restarting anything:
+
+- choose **Razorpay** or **Test payments without Razorpay** (the latter is unavailable in production);
+- paste the Key Id and Key Secret, press **Generate** for a webhook secret, and copy the webhook URL shown into Razorpay;
+- **Test connection** makes one read-only call to Razorpay with the keys; **Save** applies them to the next request.
+
+Secrets are encrypted at rest (Fernet; key from `SETTINGS_ENCRYPTION_KEY` or `STORAGE_DIR/private/settings.key`, never the database), are never sent back to the browser, and every change and connection test is in the audit log (which records the key id and *whether* a secret changed, never the secret). Switching to `rzp_live_` keys asks for an explicit confirmation. **Use server configuration** deletes the saved settings so `backend/.env` applies again.
+
+If the encryption key is lost or changed, saved secrets can't be decrypted: payments switch off (they never fall back to anything else) and the page asks for the keys again.
+
+The steps below do the same through `backend/.env`.
 
 ### Test mode
 

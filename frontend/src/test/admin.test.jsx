@@ -82,3 +82,57 @@ describe('Admin navigation', () => {
     expect(screen.getByRole('link', { name: 'Forgot password?' })).toBeInTheDocument();
   });
 });
+
+describe('Payment gateway settings', () => {
+  const ADMIN = { ...STAFF, id: 1, role: 'admin', permissions: [...STAFF.permissions, 'payments.settings', 'users.manage'] };
+  const CFG = {
+    mode: 'mock', active: 'mock', source: 'environment', key_id: '', key_kind: null, has_key_secret: false,
+    has_webhook_secret: false, secrets_readable: true, environment: 'staging', mock_allowed: true,
+    webhook_url: 'https://hotel.example/api/v1/payments/webhook', updated_at: null, updated_by: null,
+  };
+
+  function mount(onPut) {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, init = {}) => {
+      const u = String(url);
+      if (u.includes('/auth/me')) return json(200, ADMIN);
+      if (u.includes('/payment-settings') && init.method === 'PUT') return onPut(JSON.parse(init.body));
+      if (u.includes('/payment-settings')) return json(200, CFG);
+      return json(404, { error: { code: 'not_found', message: 'nope' } });
+    });
+    render(<MemoryRouter initialEntries={['/admin/payment-gateway']}><Routes><Route path="/admin/*" element={<AdminApp />} /></Routes></MemoryRouter>);
+  }
+
+  it('is hidden from staff', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const u = String(url);
+      if (u.includes('/auth/me')) return json(200, STAFF);
+      if (u.includes('/occupancy')) return json(200, { start: '2026-10-23', days: [], rooms: [] });
+      return json(200, DASH);
+    });
+    render(<MemoryRouter initialEntries={['/admin']}><Routes><Route path="/admin/*" element={<AdminApp />} /></Routes></MemoryRouter>);
+    expect(await screen.findByRole('link', { name: 'Bookings' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Payment gateway' })).not.toBeInTheDocument();
+  });
+
+  it('asks for confirmation before switching to live keys', async () => {
+    const user = userEvent.setup();
+    const onPut = vi.fn((body) => json(200, { ...CFG, mode: 'razorpay', active: 'live', source: 'admin', key_id: body.key_id, key_kind: 'live', has_key_secret: true, has_webhook_secret: true }));
+    mount(onPut);
+    expect(await screen.findByText(/Now active: Test payments/)).toBeInTheDocument();
+    await user.click(screen.getByLabelText(/Razorpay \(test or live keys\)/));
+    await user.type(screen.getByLabelText('Key Id'), 'rzp_live_ZyXwVu0987654321');
+    await user.type(screen.getByLabelText('Key Secret'), 'secret-value-123456');
+    await user.click(screen.getByRole('button', { name: 'Generate' }));
+    expect(screen.getByLabelText('Webhook secret').value).toMatch(/^[0-9a-f]{48}$/);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onPut).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('real money');
+    await user.type(screen.getByLabelText(/Type/), 'LIVE');
+    await user.click(screen.getByRole('button', { name: 'Use live keys' }));
+    expect(onPut).toHaveBeenCalledOnce();
+    expect(onPut.mock.calls[0][0]).toMatchObject({ mode: 'razorpay', key_id: 'rzp_live_ZyXwVu0987654321', confirm_live: true });
+    expect(await screen.findByText(/Now active: Razorpay LIVE/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Key Secret').value).toBe('');      // never echoed back
+  });
+});

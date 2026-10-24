@@ -22,9 +22,9 @@ from app.models import AdminUser, Booking, Payment
 from app.models.enums import AdminRole, BookingStatus, PaymentStatus
 from app.repositories.bookings import expire_stale_holds
 from app.seed import seed
-from app.services import payment_service
+from app.services import payment_service, payment_settings_service
 from app.services.auth_service import revoke_all
-from app.services.razorpay_gateway import get_gateway
+from app.services.razorpay_gateway import gateway_for
 
 
 def cmd_seed(_args) -> int:
@@ -58,7 +58,8 @@ def cmd_create_admin(args) -> int:
 
 
 def cmd_reconcile(args) -> int:
-    gateway = get_gateway()
+    with SessionLocal() as db:
+        gateway = gateway_for(payment_settings_service.load(db))
     if gateway is None:
         print("Razorpay keys are not configured.", file=sys.stderr)
         return 1

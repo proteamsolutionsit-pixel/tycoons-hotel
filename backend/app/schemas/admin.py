@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -456,3 +456,41 @@ class Dashboard(BaseModel):
 class UploadOut(BaseModel):
     url: str
     size: int
+
+
+# -- Payment gateway settings ------------------------------------------------
+class PaymentSettingsOut(BaseModel):
+    """What is in force. Secrets are never returned - only whether one is set."""
+
+    mode: Literal["mock", "razorpay"]
+    active: Literal["mock", "test", "live", "disabled"]
+    source: Literal["admin", "environment"]
+    key_id: str
+    key_kind: Literal["test", "live"] | None
+    has_key_secret: bool
+    has_webhook_secret: bool
+    secrets_readable: bool
+    environment: str
+    mock_allowed: bool
+    webhook_url: str
+    updated_at: datetime | None
+    updated_by: str | None
+
+
+class PaymentSettingsUpdate(StrictInput):
+    mode: Literal["mock", "razorpay"]
+    key_id: str = Field(default="", max_length=64)
+    # Blank keeps the stored secret
+    key_secret: str | None = Field(default=None, max_length=128)
+    webhook_secret: str | None = Field(default=None, max_length=128)
+    confirm_live: bool = False
+
+
+class PaymentSettingsTest(StrictInput):
+    key_id: str = Field(default="", max_length=64)
+    key_secret: str | None = Field(default=None, max_length=128)
+
+
+class PaymentSettingsTestResult(BaseModel):
+    ok: bool
+    message: str

@@ -6,8 +6,8 @@ the application already had; their effective rights are unchanged:
 
 * staff - front-desk work: read bookings/payments, handle guest requests,
           read (not change) rates, content and settings.
-* admin - everything, including refunds, rates, content, settings, users
-          and the audit log.
+* admin - everything, including refunds, payment gateway keys, rates,
+          content, settings, users and the audit log.
 """
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ class Permission(str, enum.Enum):
     PAYMENTS_VIEW = "payments.view"
     PAYMENTS_RECONCILE = "payments.reconcile"
     PAYMENTS_REFUND = "payments.refund"
+    PAYMENTS_SETTINGS = "payments.settings"    # gateway mode and Razorpay keys
     SUBMISSIONS_VIEW = "submissions.view"
     SUBMISSIONS_MANAGE = "submissions.manage"
     CATALOG_VIEW = "catalog.view"              # rooms & rates, content, settings (read)

@@ -36,6 +36,7 @@ os.environ.update({
     "RAZORPAY_KEY_ID": "rzp_test_fake",
     "RAZORPAY_KEY_SECRET": KEY_SECRET,
     "RAZORPAY_WEBHOOK_SECRET": WEBHOOK_SECRET,
+    "PAYMENT_MODE": "razorpay",          # a developer's .env may say mock
     "RATE_LIMIT_ENABLED": "false",
     "RATE_LIMIT_BACKEND": "database",
     "LOG_JSON": "false",

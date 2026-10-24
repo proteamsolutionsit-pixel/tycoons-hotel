@@ -5,6 +5,7 @@ in a fake, and so SDK/network errors surface as one exception type.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import warnings
 from typing import Any, Protocol
@@ -13,9 +14,14 @@ with warnings.catch_warnings():
     # razorpay 1.4.2 imports pkg_resources (needs setuptools, pinned in requirements)
     warnings.simplefilter("ignore", UserWarning)
     import razorpay
+from fastapi import Depends
 from razorpay.errors import SignatureVerificationError
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.db.session import get_db
+from app.services import payment_settings_service
+from app.services.payment_settings_service import GatewayConfig
 
 log = logging.getLogger("app.razorpay")
 
@@ -74,6 +80,10 @@ class RazorpayGateway:
         return self._call("payment.refund", self._client.payment.refund, payment_id,
                           data={"amount": amount, "speed": "normal", "notes": notes})
 
+    def check_credentials(self) -> None:
+        """Cheapest authenticated call: raises GatewayError if the keys are refused."""
+        self._call("order.all", self._client.order.all, data={"count": 1})
+
     # -- signatures (HMAC-SHA256, verified by the SDK) -------------------
     def verify_payment_signature(self, order_id: str, payment_id: str, signature: str) -> bool:
         try:
@@ -100,20 +110,34 @@ class RazorpayGateway:
             return False
 
 
-_gateway: RazorpayGateway | None = None
+_cache: dict[tuple, RazorpayGateway] = {}
 
 
-def get_gateway() -> PaymentGateway | None:
-    """FastAPI dependency. The mock gateway in PAYMENT_MODE=mock (never in
-    production); otherwise Razorpay, or None when its keys are not configured."""
-    global _gateway
+def gateway_for(cfg: GatewayConfig) -> PaymentGateway | None:
+    """The gateway for a configuration: the mock one in test-payment mode (never
+    in production), Razorpay when keys are set, otherwise None (payments off)."""
     s = get_settings()
-    if s.payment_mode == "mock" and s.environment != "production":
+    if cfg.mode == "mock":
+        if s.environment == "production":
+            return None
         from app.services.mock_gateway import mock_gateway
         return mock_gateway
-    if not s.razorpay_configured:
+    if not (cfg.key_id and cfg.key_secret):
         return None
-    if _gateway is None:
-        _gateway = RazorpayGateway(s.razorpay_key_id, s.razorpay_key_secret, s.razorpay_webhook_secret,
-                                   s.razorpay_timeout_seconds)
-    return _gateway
+    # One client per distinct key set; hashes keep secrets out of the cache key
+    key = (cfg.key_id, _digest(cfg.key_secret), _digest(cfg.webhook_secret), s.razorpay_timeout_seconds)
+    gw = _cache.get(key)
+    if gw is None:
+        _cache.clear()
+        gw = _cache[key] = RazorpayGateway(cfg.key_id, cfg.key_secret, cfg.webhook_secret, s.razorpay_timeout_seconds)
+    return gw
+
+
+def get_gateway(db: Session = Depends(get_db)) -> PaymentGateway | None:
+    """FastAPI dependency: the gateway for the configuration in force right now
+    (Admin > Payment gateway, else the environment)."""
+    return gateway_for(payment_settings_service.load(db))
+
+
+def _digest(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()

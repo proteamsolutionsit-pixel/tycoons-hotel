@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     # "mock" = test payments without a Razorpay account (development only;
     # production refuses to start with it).
     payment_mode: Literal["razorpay", "mock"] = "razorpay"
+    # Values saved in Admin > Payment gateway override PAYMENT_MODE and the RAZORPAY_* keys above.
+    # Secrets saved from the admin are encrypted with this Fernet key; without it a
+    # key file is generated under STORAGE_DIR/private (keep it with your backups).
+    settings_encryption_key: str = ""
 
     # Hotel rules ------------------------------------------------------------
     hotel_name: str = "The Tycoons Hotel"
@@ -106,9 +110,8 @@ class Settings(BaseSettings):
         problems = []
         if self.environment == "production" and self.payment_mode != "razorpay":
             problems.append("PAYMENT_MODE must be razorpay (test payments are not allowed in production)")
-        if self.payment_mode == "razorpay" and not (
-                self.razorpay_key_id and self.razorpay_key_secret and self.razorpay_webhook_secret):
-            problems.append("RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are required")
+        # Razorpay keys may come from .env or from Admin > Payment gateway, so their
+        # absence here is not fatal: payments stay disabled until one of them is set.
         if not self.cookie_secure:
             problems.append("COOKIE_SECURE must be true (serve over HTTPS)")
         if "*" in self.allowed_host_list:

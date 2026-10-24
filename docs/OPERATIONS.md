@@ -65,6 +65,9 @@
   which also strips Passenger's `X-Powered-By`. On nginx hosts `deploy/nginx.conf` does this instead. Keep the block
   outside the CloudLinux-managed sections; re-check it after changing the app in Setup Python App.
 - API docs (`/api/v1/docs`, `/openapi.json`, `/redoc`) are served only when `ENVIRONMENT` is development or test.
+- Razorpay keys are entered in *Admin → Payment gateway*. Their secrets are encrypted with
+  `~/tycoons_storage/private/settings.key` (or `SETTINGS_ENCRYPTION_KEY` in `.env`): include that file in backups.
+  Without it a restored database has no usable secrets and the keys must be entered again.
 - If every request returns Passenger's "something went wrong" page and `~/logs/tycoons.log` says
   `PassengerAgent ... No such file or directory`, the host's Passenger install is broken. Only root/WHM can fix that.
 

@@ -21,7 +21,8 @@ function Invoke-Sql([string]$sql) { $sql | & "$bin\mysql.exe" --host=127.0.0.1 -
 
 $lines = Get-Content $envFile
 $current = ($lines | Where-Object { $_ -match "^DATABASE_URL=mysql\+pymysql://$User`:" }) -replace "^DATABASE_URL=mysql\+pymysql://$User`:([^@]+)@.*$", '$1'
-$exists = (Invoke-Sql "SELECT COUNT(*) FROM mysql.user WHERE user='$User';") -eq '1'
+# One row per host ('127.0.0.1' and 'localhost'), so any count above zero means it exists
+$exists = [int](Invoke-Sql "SELECT COUNT(*) FROM mysql.user WHERE user='$User';") -gt 0
 if ($exists -and $current) { $pw = $current } else {
   $chars = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'.ToCharArray()  # pragma: allowlist secret
   $b = New-Object byte[] 24; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)

@@ -6,7 +6,7 @@ import './admin.css';
 import { api } from '../services/api';
 import { AuthProvider, RequireAuth, useAuth } from './auth';
 import {
-  IconBed, IconCalendar, IconCard, IconClose, IconDashboard, IconImage, IconInbox, IconLogout, IconMenu, IconShield,
+  IconBed, IconCalendar, IconCard, IconClose, IconDashboard, IconImage, IconInbox, IconKey, IconLogout, IconMenu, IconShield,
   IconSliders, IconTag, IconUser, IconUsers,
 } from './icons';
 import Account from './pages/Account';
@@ -16,6 +16,7 @@ import Content from './pages/Content';
 import Dashboard from './pages/Dashboard';
 import Occupancy from './pages/Occupancy';
 import Payments from './pages/Payments';
+import PaymentSettings from './pages/PaymentSettings';
 import RoomTypes from './pages/RoomTypes';
 import Settings from './pages/Settings';
 import Submissions from './pages/Submissions';
@@ -37,6 +38,7 @@ const NAV = [
     ['/admin/settings', 'Site settings', IconSliders, 'catalog.view'],
   ] },
   { group: 'Administration', items: [
+    ['/admin/payment-gateway', 'Payment gateway', IconKey, 'payments.settings'],
     ['/admin/users', 'Staff users', IconUsers, 'users.manage'],
     ['/admin/audit', 'Audit log', IconShield, 'audit.view'],
   ] },
@@ -212,6 +214,7 @@ function Shell() {
             <Route path="rooms" element={guard('catalog.view', <RoomTypes />)} />
             <Route path="content" element={guard('catalog.view', <Content />)} />
             <Route path="settings" element={guard('catalog.view', <Settings />)} />
+            <Route path="payment-gateway" element={guard('payments.settings', <PaymentSettings />)} />
             <Route path="users" element={guard('users.manage', <Users />)} />
             <Route path="audit" element={guard('audit.view', <AuditLog />)} />
             <Route path="account" element={<Account />} />
