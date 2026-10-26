@@ -37,6 +37,23 @@ export function longDate(iso) {
   }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 
+/** Compact stay range for tables: "25 – 26 Oct 2026", "30 Oct – 2 Nov 2026",
+    "30 Dec 2026 – 2 Jan 2027". */
+export function stayRange(checkIn, checkOut) {
+  if (!checkIn || !checkOut) return '';
+  const parts = (iso) => {
+    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+    const month = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, d)));
+    return { y, m, d, month };
+  };
+  const a = parts(checkIn);
+  const b = parts(checkOut);
+  const end = `${b.d} ${b.month} ${b.y}`;
+  if (a.y !== b.y) return `${a.d} ${a.month} ${a.y} – ${end}`;
+  if (a.m !== b.m) return `${a.d} ${a.month} – ${end}`;
+  return `${a.d} – ${end}`;
+}
+
 /** API datetimes are naive UTC; show them in hotel time. */
 export function dateTime(iso) {
   if (!iso) return '';
@@ -44,6 +61,13 @@ export function dateTime(iso) {
   return new Intl.DateTimeFormat('en-IN', {
     dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata',
   }).format(dt);
+}
+
+/** Hotel-time date only: "23 Oct 2026". */
+export function dateOnly(iso) {
+  if (!iso) return '';
+  const dt = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(iso) ? iso : iso + 'Z');
+  return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' }).format(dt);
 }
 
 export function timeOnly(iso) {

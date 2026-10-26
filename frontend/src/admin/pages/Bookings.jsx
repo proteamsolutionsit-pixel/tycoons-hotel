@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
-import { dateTime, guestsLabel, longDate, rupees } from '../../utils/format';
+import { dateOnly, dateTime, guestsLabel, longDate, rupees, stayRange, timeOnly } from '../../utils/format';
 import { Can, useAuth } from '../auth';
 import { Badge, ConfirmDialog, Drawer, PageTitle, Pager, SearchBox, SortHeader, StateRow, useAdminList, useToast } from '../ui';
 
@@ -59,11 +59,11 @@ export default function Bookings() {
                 <td className="adm-mono">{b.reference}</td>
                 <td>{b.guest_name}<br /><span className="adm-muted">{b.guest_email}</span></td>
                 <td>{b.room_type_name}</td>
-                <td>{longDate(b.check_in)} → {longDate(b.check_out)}<br /><span className="adm-muted">{b.nights} nt · {guestsLabel(b.adults, b.children)}</span></td>
+                <td className="adm-nowrap" title={`${longDate(b.check_in)} → ${longDate(b.check_out)}`}>{stayRange(b.check_in, b.check_out)}<br /><span className="adm-muted">{b.nights} nt · {guestsLabel(b.adults, b.children)}</span></td>
                 <td className="adm-num">{rupees(b.total_paise)}</td>
                 <td><Badge value={b.status} /></td>
                 <td><Badge value={b.payment_status} /></td>
-                <td className="adm-muted">{dateTime(b.created_at)}</td>
+                <td className="adm-muted adm-nowrap">{dateOnly(b.created_at)}<br />{timeOnly(b.created_at)}</td>
               </tr>
             ))}
           </tbody>
