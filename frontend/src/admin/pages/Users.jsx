@@ -39,7 +39,7 @@ export default function Users() {
     setNotice(null);
     const fallback = (roles.data || []).find((r) => r.key === 'front_desk')?.id ?? '';
     setForm(u === 'new' ? { email: '', full_name: '', role_id: String(fallback), password: '' }
-      : { full_name: u.full_name, role_id: String(u.role_id ?? ''), is_active: u.is_active, new_password: '' });
+      : { email: u.email, full_name: u.full_name, role_id: String(u.role_id ?? ''), is_active: u.is_active, new_password: '' });
   };
 
   const run = async (fn, msg, close = true) => {
@@ -98,7 +98,8 @@ export default function Users() {
             </form>
           ) : (
             <>
-              <form className="adm-form" onSubmit={(e) => { e.preventDefault(); run(() => api.patch(`/api/v1/admin/users/${open.id}`, { full_name: form.full_name, role_id: Number(form.role_id), is_active: form.is_active }), 'User updated.'); }}>
+              <form className="adm-form" onSubmit={(e) => { e.preventDefault(); run(() => api.patch(`/api/v1/admin/users/${open.id}`, { email: form.email, full_name: form.full_name, role_id: Number(form.role_id), is_active: form.is_active }), 'User updated.'); }}>
+                <div className="adm-field adm-field--wide"><label htmlFor="u-email2">Email (used to sign in)</label><input id="u-email2" className="adm-input" type="email" required value={form.email} onChange={set('email')} /></div>
                 <div className="adm-field adm-field--wide"><label htmlFor="u-name2">Full name</label><input id="u-name2" className="adm-input" required value={form.full_name} onChange={set('full_name')} /></div>
                 <div className="adm-field"><label htmlFor="u-role2">Role</label><select id="u-role2" className="adm-input" required value={form.role_id} onChange={set('role_id')}>
                 {(roles.data || []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}

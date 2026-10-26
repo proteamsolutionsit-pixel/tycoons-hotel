@@ -66,6 +66,7 @@ class AdminUserCreate(StrictInput):
 
 
 class AdminUserUpdate(StrictInput):
+    email: EmailStr | None = None              # the sign-in name; must stay unique
     full_name: str | None = Field(default=None, min_length=2, max_length=120)
     role_id: int | None = None
     role: AdminRole | None = None

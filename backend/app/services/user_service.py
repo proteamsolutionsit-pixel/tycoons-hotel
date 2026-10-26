@@ -78,6 +78,17 @@ def update(db: Session, user_id: int, data: AdminUserUpdate, actor: AdminUser, r
     if demoting and user.role == AdminRole.ADMIN and user.is_active and _active_admins(db) <= 1:
         raise Conflict("You can't remove the last active administrator.", code="last_admin")
     diff: dict = {}
+    if changes.get("email") is not None:
+        email = str(changes.pop("email")).strip().lower()
+        if email != user.email:
+            clash = db.execute(select(AdminUser).where(func.lower(AdminUser.email) == email)).scalar_one_or_none()
+            if clash is not None:
+                raise Conflict("Another user already signs in with that email.", code="duplicate_email",
+                               details=[{"field": "email", "message": "Already in use."}])
+            diff["email"] = {"from": user.email, "to": email}
+            user.email = email
+    else:
+        changes.pop("email", None)
     if new_role is not None and new_role.id != user.role_id:
         diff["role"] = {"from": user.role_name, "to": new_role.name}
         _assign(user, new_role)

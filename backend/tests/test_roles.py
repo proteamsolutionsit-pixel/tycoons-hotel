@@ -122,3 +122,27 @@ def test_legacy_role_field_still_works(client, admin_headers):
     r = client.post(U, json={"email": "legacy@tycoons.example.com", "full_name": "Legacy User", "role": "staff",
                              "password": PW}, headers=admin_headers)
     assert r.status_code == 201 and r.json()["role_name"] == "Front desk" and r.json()["role"] == "staff"
+
+
+def test_admin_can_change_a_users_sign_in_email(client, admin_headers, db):
+    admin = db.query(AdminUser).filter_by(email="admin@tycoons.example.com").one()
+    r = client.patch(f"{U}/{admin.id}", json={"email": "Boss@Tycoons.Example.com"}, headers=admin_headers)
+    assert r.status_code == 200 and r.json()["email"] == "boss@tycoons.example.com"
+    entry = db.query(AuditLog).filter_by(action="user.update").one()
+    assert entry.details["changes"]["email"] == {"from": "admin@tycoons.example.com", "to": "boss@tycoons.example.com"}
+    # duplicates refused; the new address signs in
+    staff = db.query(AdminUser).filter_by(email="staff@tycoons.example.com").one()
+    assert client.patch(f"{U}/{staff.id}", json={"email": "boss@tycoons.example.com"}, headers=admin_headers).status_code == 409
+    client.cookies.clear()
+    from tests.conftest import ADMIN_PW
+    login(client, "boss@tycoons.example.com", ADMIN_PW)
+    assert client.get("/api/v1/admin/auth/me").json()["email"] == "boss@tycoons.example.com"
+
+
+def test_user_manager_cannot_change_an_administrators_email(client, admin_headers, db):
+    hr = _role(client, admin_headers, "HR desk", ["users.manage"])
+    _user(client, admin_headers, "hr2@tycoons.example.com", hr["id"])
+    admin_id = db.query(AdminUser).filter_by(email="admin@tycoons.example.com").one().id
+    client.cookies.clear()
+    headers = login(client, "hr2@tycoons.example.com", PW)
+    assert client.patch(f"{U}/{admin_id}", json={"email": "evil@tycoons.example.com"}, headers=headers).status_code == 403
