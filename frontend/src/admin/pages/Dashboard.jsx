@@ -1,7 +1,7 @@
 /* Dashboard: every figure comes from GET /admin/dashboard and /admin/occupancy
    for the signed-in user's permissions. Nothing is estimated or hardcoded. */
 import { Link } from 'react-router-dom';
-import { hotelToday, rupees } from '../../utils/format';
+import { hotelToday, plural, rupees } from '../../utils/format';
 import { useAuth } from '../auth';
 import { IconAlert, IconCheck, IconRefresh } from '../icons';
 import { OccupancyGrid } from './Occupancy';
@@ -39,9 +39,9 @@ export default function Dashboard() {
           <>
             <StatCard label="Occupancy tonight" value={`${v.occupancy_tonight_pct}%`} hint={`${v.rooms_sold_tonight} of ${v.rooms_total} rooms sold`} />
             <StatCard label="Arrivals today" value={v.arrivals_today} hint={`${v.arrivals_next_7_days} in the next 7 days`} LinkComp={Link} to="/admin/bookings?status=confirmed&sort=check_in&order=asc" />
-            <StatCard label="Departures today" value={v.departures_today} hint={`${v.in_house_tonight} guests in house tonight`} />
+            <StatCard label="Departures today" value={v.departures_today} hint={`${plural(v.in_house_tonight, 'guest')} in house tonight`} />
             <StatCard label="Awaiting payment" value={v.pending_payment} hint="Rooms on hold right now" LinkComp={Link} to="/admin/bookings?status=pending_payment" />
-            {can('payments.view') && <StatCard label="Captured, 30 days" value={rupees(v.revenue_30d_paise)} hint={`${v.confirmed_30d} bookings confirmed`} LinkComp={Link} to="/admin/payments?status=captured" />}
+            {can('payments.view') && <StatCard label="Captured, 30 days" value={rupees(v.revenue_30d_paise)} hint={`${plural(v.confirmed_30d, 'booking')} confirmed`} LinkComp={Link} to="/admin/payments?status=captured" />}
             {can('payments.view') && <StatCard label="Refunded, 30 days" value={rupees(v.refunded_30d_paise)} hint="Processed refunds" LinkComp={Link} to="/admin/payments?status=refunded" />}
           </>
         )}

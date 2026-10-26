@@ -2,7 +2,7 @@ import { useSearchParams } from 'react-router-dom';
 import ResourceManager from '../ResourceManager';
 import { Badge, PageTitle } from '../ui';
 
-const active = { label: 'Shown', render: (r) => <Badge value={r.is_active ? 'active' : 'hidden'} /> };
+const active = { label: 'Shown', sort: 'is_active', render: (r) => <Badge value={r.is_active ? 'active' : 'hidden'} /> };
 const thumb = (key = 'image_url') => ({ label: 'Photo', render: (r) => <img src={r[key]} alt="" style={{ height: 44, width: 66, objectFit: 'cover' }} /> });
 
 const TABS = {
@@ -39,7 +39,7 @@ const TABS = {
       { name: 'sort_order', label: 'Order', type: 'number' },
       { name: 'is_active', label: 'Shown on the site', type: 'checkbox' },
     ],
-    columns: [thumb(), { label: 'Section', render: (r) => r.section.replace(/_/g, ' ') }, { label: 'Title', key: 'title' }, { label: 'Order', key: 'sort_order' }, active],
+    columns: [thumb(), { label: 'Section', sort: 'section', render: (r) => r.section.replace(/_/g, ' ') }, { label: 'Title', key: 'title' }, { label: 'Order', key: 'sort_order' }, active],
   },
   gallery: {
     label: 'Gallery', endpoint: '/api/v1/admin/gallery', noun: 'Photo',
@@ -57,7 +57,7 @@ const TABS = {
       { name: 'is_active', label: 'Shown on the site', type: 'checkbox' },
     ],
     columns: [thumb(), { label: 'Caption', key: 'alt' }, { label: 'Filter', key: 'category' }, { label: 'Tile', key: 'layout' },
-      { label: 'Homepage', render: (r) => (r.on_home ? `#${r.home_order}` : '—') }, active],
+      { label: 'Homepage', sort: 'home_order', render: (r) => (r.on_home ? `#${r.home_order}` : '—') }, active],
   },
   openings: {
     label: 'Job openings', endpoint: '/api/v1/admin/job-openings', noun: 'Opening',

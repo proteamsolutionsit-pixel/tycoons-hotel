@@ -31,10 +31,10 @@ export default function RoomTypes() {
         columns={[
           { label: 'Order', key: 'sort_order' },
           { label: 'Room', key: 'name' },
-          { label: 'Rate / night', render: (r) => rupees(r.base_rate_paise) },
+          { label: 'Rate / night', sort: 'base_rate_paise', render: (r) => rupees(r.base_rate_paise) },
           { label: 'Inventory', key: 'total_rooms' },
-          { label: 'Sleeps', render: (r) => `${r.max_adults} + ${r.max_children}` },
-          { label: 'Status', render: (r) => <Badge value={r.is_active ? 'active' : 'hidden'} /> },
+          { label: 'Sleeps', sort: 'max_adults', render: (r) => `${r.max_adults} + ${r.max_children}` },
+          { label: 'Status', sort: 'is_active', render: (r) => <Badge value={r.is_active ? 'active' : 'hidden'} /> },
         ]} />
     </>
   );

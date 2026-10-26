@@ -32,6 +32,7 @@ class Permission(str, enum.Enum):
     SETTINGS_MANAGE = "settings.manage"
     USERS_MANAGE = "users.manage"
     AUDIT_VIEW = "audit.view"
+    DATA_EXPORT = "data.export"                # CSV downloads of bookings, payments, guest requests, content
 
 
 ROLE_PERMISSIONS: dict[AdminRole, frozenset[Permission]] = {

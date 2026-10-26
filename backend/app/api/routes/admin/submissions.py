@@ -1,7 +1,7 @@
 """Guest submissions from the site's forms: list, update status/notes, CV download."""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import FileResponse
@@ -10,6 +10,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require
+from app.api.tabular import EXPORT_MAX_ROWS, csv_response, like_pattern, ordered, record_export
 from app.core.errors import NotFound
 from app.core.permissions import Permission
 from app.core.timeutil import utcnow
@@ -31,8 +32,13 @@ from app.services import audit, upload_service
 router = APIRouter(prefix="/submissions", tags=["Admin: submissions"])
 VIEW = require(Permission.SUBMISSIONS_VIEW)
 MANAGE = require(Permission.SUBMISSIONS_MANAGE)
+EXPORT = require(Permission.DATA_EXPORT)
 
 SubmissionOut = TableReservationOut | SpaAppointmentOut | EnquiryOut | JobApplicationOut
+
+# The date a request is "for", used by sort=date
+DATE_COLUMN = {"table_reservations": "reservation_date", "spa_appointments": "preferred_date",
+               "enquiries": "arrival_date"}
 
 # kind -> (model, output schema, searchable columns)
 KINDS: dict[str, tuple[Any, type[BaseModel], tuple[str, ...]]] = {
@@ -61,18 +67,43 @@ def _kind(kind: str):
     return KINDS[kind]
 
 
-@router.get("/newsletter", response_model=Page[NewsletterOut])
-def list_newsletter(active: bool | None = None, q: str | None = Query(None, max_length=100),
-                    limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
-                    _: AdminUser = Depends(VIEW), db: Session = Depends(get_db)):
+NewsletterSort = Literal["created_at", "email", "status"]
+_NEWSLETTER_SORT = {"created_at": NewsletterSubscriber.consent_at, "email": NewsletterSubscriber.email,
+                    "status": NewsletterSubscriber.is_active}
+
+
+def _newsletter_filters(active: bool | None = None, q: str | None = Query(None, max_length=100),
+                        sort: NewsletterSort = "created_at", order: Literal["asc", "desc"] = "desc") -> dict:
+    return dict(active=active, q=q, sort=sort, order=order)
+
+
+def _newsletter_query(*, active, q, sort, order):
     stmt = select(NewsletterSubscriber)
     if active is not None:
         stmt = stmt.where(NewsletterSubscriber.is_active.is_(active))
     if q:
-        stmt = stmt.where(NewsletterSubscriber.email.ilike(f"%{q.strip()}%"))
+        stmt = stmt.where(NewsletterSubscriber.email.like(like_pattern(q)))
+    return stmt, ordered(stmt, _NEWSLETTER_SORT[sort], order, NewsletterSubscriber.id)
+
+
+@router.get("/newsletter", response_model=Page[NewsletterOut])
+def list_newsletter(filters: dict = Depends(_newsletter_filters),
+                    limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+                    _: AdminUser = Depends(VIEW), db: Session = Depends(get_db)):
+    stmt, sorted_stmt = _newsletter_query(**filters)
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
-    items = db.execute(stmt.order_by(NewsletterSubscriber.id.desc()).limit(limit).offset(offset)).scalars().all()
+    items = db.execute(sorted_stmt.limit(limit).offset(offset)).scalars().all()
     return Page(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/newsletter/export", summary="Download newsletter subscribers as CSV")
+def export_newsletter(request: Request, filters: dict = Depends(_newsletter_filters),
+                      actor: AdminUser = Depends(EXPORT), db: Session = Depends(get_db)):
+    _, sorted_stmt = _newsletter_query(**filters)
+    rows = db.execute(sorted_stmt.limit(EXPORT_MAX_ROWS)).scalars().all()
+    record_export(request, actor, "newsletter", len(rows), filters)
+    return csv_response("newsletter", ["email", "active", "subscribed_at_utc", "unsubscribed_at_utc"],
+                        ([r.email, r.is_active, r.consent_at, r.unsubscribed_at] for r in rows))
 
 
 @router.patch("/newsletter/{sub_id}", response_model=NewsletterOut)
@@ -89,23 +120,50 @@ def update_newsletter(sub_id: int, data: NewsletterUpdate, request: Request, act
     return row
 
 
-@router.get("/{kind}", response_model=Page[SubmissionOut])
-def list_submissions(kind: str, status: SubmissionStatus | None = None,
-                     enquiry_kind: EnquiryKind | None = None, q: str | None = Query(None, max_length=100),
-                     limit: int = Query(25, ge=1, le=100), offset: int = Query(0, ge=0),
-                     _: AdminUser = Depends(VIEW), db: Session = Depends(get_db)):
-    model, _schema, search_cols = _kind(kind)
+SubmissionSort = Literal["created_at", "name", "status", "date"]
+
+
+def _submission_filters(status: SubmissionStatus | None = None, enquiry_kind: EnquiryKind | None = None,
+                        q: str | None = Query(None, max_length=100), sort: SubmissionSort = "created_at",
+                        order: Literal["asc", "desc"] = "desc") -> dict:
+    return dict(status=status, enquiry_kind=enquiry_kind, q=q, sort=sort, order=order)
+
+
+def _submission_query(model, search_cols, *, status, enquiry_kind, q, sort, order):
     stmt = select(model)
     if status:
         stmt = stmt.where(model.status == status)
     if enquiry_kind and model is Enquiry:
         stmt = stmt.where(Enquiry.kind == enquiry_kind)
     if q:
-        like = f"%{q.strip()}%"
-        stmt = stmt.where(or_(*[getattr(model, c).ilike(like) for c in search_cols]))
+        like = like_pattern(q)
+        stmt = stmt.where(or_(*[getattr(model, c).like(like) for c in search_cols]))
+    columns = {"created_at": model.id, "name": model.name, "status": model.status,
+               "date": getattr(model, DATE_COLUMN.get(model.__tablename__, "created_at"))}
+    return stmt, ordered(stmt, columns[sort], order, model.id)
+
+
+@router.get("/{kind}", response_model=Page[SubmissionOut])
+def list_submissions(kind: str, filters: dict = Depends(_submission_filters),
+                     limit: int = Query(25, ge=1, le=200), offset: int = Query(0, ge=0),
+                     _: AdminUser = Depends(VIEW), db: Session = Depends(get_db)):
+    model, _schema, search_cols = _kind(kind)
+    stmt, sorted_stmt = _submission_query(model, search_cols, **filters)
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
-    rows = db.execute(stmt.order_by(model.id.desc()).limit(limit).offset(offset)).unique().scalars().all()
+    rows = db.execute(sorted_stmt.limit(limit).offset(offset)).unique().scalars().all()
     return Page(items=[_serialize(kind, r) for r in rows], total=total, limit=limit, offset=offset)
+
+
+@router.get("/{kind}/export", summary="Download one kind of guest request as CSV")
+def export_submissions(kind: str, request: Request, filters: dict = Depends(_submission_filters),
+                       actor: AdminUser = Depends(EXPORT), db: Session = Depends(get_db)):
+    model, _schema, search_cols = _kind(kind)
+    _, sorted_stmt = _submission_query(model, search_cols, **filters)
+    rows = db.execute(sorted_stmt.limit(EXPORT_MAX_ROWS)).unique().scalars().all()
+    record_export(request, actor, kind.replace("-", "_"), len(rows), filters)
+    items = [_serialize(kind, r).model_dump(exclude={"cv_path"}) for r in rows]
+    header = list(items[0].keys()) if items else list(_schema.model_fields)
+    return csv_response(kind, header, ([item.get(h) for h in header] for item in items))
 
 
 @router.patch("/{kind}/{item_id}", response_model=SubmissionOut)

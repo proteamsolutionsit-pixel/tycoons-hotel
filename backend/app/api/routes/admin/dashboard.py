@@ -2,17 +2,15 @@
 from the database for the signed-in user's permissions; nothing is estimated."""
 from __future__ import annotations
 
-import csv
-import io
-import json
 from datetime import date, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require
+from app.api.tabular import EXPORT_MAX_ROWS, csv_response, like_pattern, ordered, record_export
 from app.core.permissions import Permission
 from app.core.timeutil import hotel_day_start_utc, hotel_today, utcnow
 from app.db.session import get_db
@@ -31,7 +29,6 @@ from app.models import (
 from app.models.enums import BookingStatus, PaymentStatus, SubmissionStatus
 from app.schemas.admin import AuditLogOut, Dashboard, Occupancy, OccupancyRoom
 from app.schemas.common import Page
-from app.services import audit
 
 router = APIRouter(tags=["Admin: dashboard"])
 
@@ -126,12 +123,6 @@ def occupancy(start: date | None = None, days: int = Query(14, ge=1, le=62),
 AuditSort = Literal["occurred_at", "actor", "action", "resource", "outcome", "ip"]
 _AUDIT_SORT = {"occurred_at": AuditLog.id, "actor": AuditLog.actor_email, "action": AuditLog.action,
                "resource": AuditLog.resource_type, "outcome": AuditLog.outcome, "ip": AuditLog.ip}
-EXPORT_MAX_ROWS = 10_000
-
-
-def _like(text: str) -> str:
-    """Substring pattern with LIKE wildcards in the user's text taken literally."""
-    return "%" + text.strip().replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_") + "%"
 
 
 def _audit_query(*, q: str | None, action: str | None, actor_id: int | None, resource_type: str | None,
@@ -139,12 +130,12 @@ def _audit_query(*, q: str | None, action: str | None, actor_id: int | None, res
                  sort: str, order: str):
     stmt = select(AuditLog)
     if q:
-        like = _like(q)
+        like = like_pattern(q)
         stmt = stmt.where(or_(AuditLog.actor_email.like(like), AuditLog.action.like(like),
                               AuditLog.resource_type.like(like), AuditLog.resource_id.like(like),
                               AuditLog.ip.like(like), AuditLog.request_id.like(like)))
     if action:
-        stmt = stmt.where(AuditLog.action.like(_like(action)[1:]))      # "starts with"
+        stmt = stmt.where(AuditLog.action.like(like_pattern(action, prefix=True)))
     if actor_id is not None:
         stmt = stmt.where(AuditLog.actor_id == actor_id)
     if resource_type:
@@ -158,9 +149,7 @@ def _audit_query(*, q: str | None, action: str | None, actor_id: int | None, res
         stmt = stmt.where(AuditLog.occurred_at >= hotel_day_start_utc(date_from))
     if date_to:
         stmt = stmt.where(AuditLog.occurred_at < hotel_day_start_utc(date_to + timedelta(days=1)))
-    col = _AUDIT_SORT[sort]
-    ordered = stmt.order_by(col.asc() if order == "asc" else col.desc(), AuditLog.id.desc())
-    return stmt, ordered
+    return stmt, ordered(stmt, _AUDIT_SORT[sort], order, AuditLog.id)
 
 
 def _audit_filters(q: str | None = Query(None, max_length=100, description="Search actor, action, resource, IP, request id"),
@@ -177,35 +166,19 @@ def _audit_filters(q: str | None = Query(None, max_length=100, description="Sear
 @router.get("/audit-logs", response_model=Page[AuditLogOut], summary="Audit trail (read-only)")
 def audit_logs(filters: dict = Depends(_audit_filters), limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
                _: AdminUser = Depends(require(Permission.AUDIT_VIEW)), db: Session = Depends(get_db)):
-    stmt, ordered = _audit_query(**filters)
+    stmt, sorted_stmt = _audit_query(**filters)
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
-    items = db.execute(ordered.limit(limit).offset(offset)).scalars().all()
+    items = db.execute(sorted_stmt.limit(limit).offset(offset)).scalars().all()
     return Page(items=items, total=total, limit=limit, offset=offset)
-
-
-def _csv_cell(value) -> str:
-    """Neutralise spreadsheet formulas (CSV injection): =, +, -, @, tab, CR."""
-    text = "" if value is None else str(value)
-    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
 
 
 @router.get("/audit-logs/export", summary="Download the filtered audit trail as CSV (up to 10,000 rows)")
 def export_audit_logs(request: Request, filters: dict = Depends(_audit_filters),
                       actor: AdminUser = Depends(require(Permission.AUDIT_VIEW)), db: Session = Depends(get_db)):
-    _, ordered = _audit_query(**filters)
-    rows = db.execute(ordered.limit(EXPORT_MAX_ROWS)).scalars().all()
-    buf = io.StringIO()
-    w = csv.writer(buf)
-    w.writerow(["id", "occurred_at_utc", "actor_type", "actor_id", "actor_email", "action", "resource_type",
-                "resource_id", "outcome", "ip", "request_id", "details"])
-    for e in rows:
-        w.writerow([_csv_cell(v) for v in (
-            e.id, e.occurred_at.isoformat(sep=" "), e.actor_type, e.actor_id, e.actor_email, e.action, e.resource_type,
-            e.resource_id, e.outcome, e.ip, e.request_id,
-            json.dumps(e.details, ensure_ascii=False, default=str) if e.details is not None else "")])
-    # Exporting the trail is itself an auditable event (details were redacted when written)
-    audit.record_now(action="audit.export", actor=actor, resource_type="audit_log", request=request,
-                     details={"rows": len(rows), "filters": {k: str(v) for k, v in filters.items() if v not in (None, "")}})
-    name = f"audit-log-{hotel_today().isoformat()}.csv"
-    return Response("\ufeff" + buf.getvalue(), media_type="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+    _, sorted_stmt = _audit_query(**filters)
+    rows = db.execute(sorted_stmt.limit(EXPORT_MAX_ROWS)).scalars().all()
+    record_export(request, actor, "audit", len(rows), filters)
+    return csv_response("audit-log", ["id", "occurred_at_utc", "actor_type", "actor_id", "actor_email", "action",
+                                      "resource_type", "resource_id", "outcome", "ip", "request_id", "details"],
+                        ((e.id, e.occurred_at, e.actor_type, e.actor_id, e.actor_email, e.action, e.resource_type,
+                          e.resource_id, e.outcome, e.ip, e.request_id, e.details) for e in rows))

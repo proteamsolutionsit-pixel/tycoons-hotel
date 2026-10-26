@@ -6,16 +6,17 @@ No `from __future__ import annotations` here: the route signatures use the
 schema classes passed into the factory, which FastAPI must see as real
 objects, not strings it would look up in module globals."""
 import enum
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import String, Text, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import require
-from app.core.errors import Conflict, NotFound
+from app.api.tabular import EXPORT_MAX_ROWS, csv_response, like_pattern, ordered, record_export
+from app.core.errors import AppError, Conflict, NotFound
 from app.core.permissions import Permission
 from app.db.session import get_db
 from app.models import AdminUser
@@ -33,19 +34,49 @@ def crud_router(*, prefix: str, tag: str, model: Any, out: type[BaseModel], crea
     """filters maps a query-parameter name to the model column it filters."""
     router = APIRouter(prefix=prefix, tags=[tag])
     filters = filters or {}
-    VIEW, MANAGE = require(view), require(manage)
+    VIEW, MANAGE, EXPORT = require(view), require(manage), require(Permission.DATA_EXPORT)
 
-    @router.get("", response_model=Page[out])  # type: ignore[valid-type]
-    def list_items(limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0),
-                   filter_field: str | None = Query(None, alias="field"),
-                   filter_value: str | None = Query(None, alias="value", max_length=100),
-                   _: AdminUser = Depends(VIEW), db: Session = Depends(get_db)):
+    # Data-table support: search the short text columns, sort by any column
+    columns = {c.name: c for c in model.__table__.columns}
+    searchable = [c for c in model.__table__.columns if isinstance(c.type, String) and not isinstance(c.type, Text)]
+
+    def _query(q: str | None, sort: str | None, order: str, filter_field: str | None, filter_value: str | None):
         stmt = select(model)
         if filter_field in filters and filter_value is not None:
             stmt = stmt.where(filters[filter_field] == filter_value)
+        if q and searchable:
+            like = like_pattern(q)
+            stmt = stmt.where(or_(*[c.like(like) for c in searchable]))
+        if sort:
+            if sort not in columns:
+                raise AppError("Unknown sort column.", code="validation_error", status_code=422,
+                               details=[{"field": "sort", "message": "Unknown sort column."}])
+            return stmt, ordered(stmt, columns[sort], order, model.id)
+        return stmt, stmt.order_by(*order_by)
+
+    def _params(q: str | None = Query(None, max_length=100), sort: str | None = Query(None, max_length=64),
+                order: Literal["asc", "desc"] = "asc", filter_field: str | None = Query(None, alias="field"),
+                filter_value: str | None = Query(None, alias="value", max_length=100)) -> dict:
+        return dict(q=q, sort=sort, order=order, filter_field=filter_field, filter_value=filter_value)
+
+    @router.get("", response_model=Page[out])  # type: ignore[valid-type]
+    def list_items(params: dict = Depends(_params), limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0),
+                   _: AdminUser = Depends(VIEW), db: Session = Depends(get_db)):
+        stmt, sorted_stmt = _query(**params)
         total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
-        items = db.execute(stmt.order_by(*order_by).limit(limit).offset(offset)).scalars().all()
+        items = db.execute(sorted_stmt.limit(limit).offset(offset)).scalars().all()
         return Page(items=items, total=total, limit=limit, offset=offset)
+
+    # Before /{item_id}, so "export" is not read as an id
+    @router.get("/export", summary="Download as CSV")
+    def export_items(request: Request, params: dict = Depends(_params), actor: AdminUser = Depends(EXPORT),
+                     db: Session = Depends(get_db)):
+        _, sorted_stmt = _query(**params)
+        rows = db.execute(sorted_stmt.limit(EXPORT_MAX_ROWS)).scalars().all()
+        record_export(request, actor, resource, len(rows), params)
+        header = list(out.model_fields)
+        return csv_response(prefix.strip("/"), header,
+                            ([getattr(out.model_validate(r), h) for h in header] for r in rows))
 
     @router.get("/{item_id}", response_model=out)
     def get_item(item_id: int, _: AdminUser = Depends(VIEW), db: Session = Depends(get_db)):

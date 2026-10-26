@@ -1,12 +1,32 @@
 import { useState } from 'react';
 import { api } from '../../services/api';
+import { downloadCsv } from '../../utils/csv';
 import { dateTime } from '../../utils/format';
 import { useAuth } from '../auth';
-import { Badge, Drawer, Notice, PageTitle, StateRow, useAdminList } from '../ui';
+import { Badge, Drawer, Notice, PageTitle, Pager, SearchBox, SortHeader, StateRow, useAdminList, useTableState } from '../ui';
+
+const SORT_VALUE = {
+  full_name: (u) => u.full_name.toLowerCase(), email: (u) => u.email.toLowerCase(), role: (u) => u.role,
+  is_active: (u) => (u.is_active ? 1 : 0), last_login_at: (u) => u.last_login_at || '',
+};
 
 export default function Users() {
-  const { user: me, handleError } = useAuth();
+  const { user: me, handleError, can } = useAuth();
   const list = useAdminList('/api/v1/admin/users');
+  // The staff list is small and loaded whole, so search/sort/paging happen here
+  const table = useTableState({ sort: 'full_name', order: 'asc' });
+  const { q, sort, order, limit, offset } = table.state;
+  const needle = q.trim().toLowerCase();
+  const rows = (list.data || [])
+    .filter((u) => !needle || [u.full_name, u.email, u.role].some((v) => String(v).toLowerCase().includes(needle)))
+    .sort((a, b) => {
+      const x = SORT_VALUE[sort](a);
+      const y = SORT_VALUE[sort](b);
+      return (x < y ? -1 : x > y ? 1 : a.id - b.id) * (order === 'asc' ? 1 : -1);
+    });
+  const page = list.data ? { items: rows.slice(offset, offset + limit), total: rows.length, limit, offset } : null;
+  const exportCsv = () => downloadCsv('staff-users', ['name', 'email', 'role', 'active', 'last_sign_in_utc', 'created_at_utc'],
+    rows.map((u) => [u.full_name, u.email, u.role, u.is_active, u.last_login_at, u.created_at]));
   const [open, setOpen] = useState(null); // 'new' | user
   const [notice, setNotice] = useState(null);
   const [form, setForm] = useState({});
@@ -28,15 +48,26 @@ export default function Users() {
 
   return (
     <>
-      <PageTitle title="Staff users"><button type="button" className="adm-btn" onClick={() => start('new')}>New user</button></PageTitle>
+      <PageTitle title="Staff users">
+        {can('data.export') && <button type="button" className="adm-btn adm-btn--ghost" onClick={exportCsv} disabled={!rows.length}>Export CSV</button>}
+        <button type="button" className="adm-btn" onClick={() => start('new')}>New user</button>
+      </PageTitle>
       {!open && <Notice notice={notice} onClose={() => setNotice(null)} />}
       <p className="adm-muted"><strong>Admin</strong>: everything. <strong>Staff</strong>: read bookings and payments, handle guest requests.</p>
+      <div className="adm-toolbar"><SearchBox value={q} onChange={(v) => table.set({ q: v })} placeholder="Name, email or role" /></div>
       <div className="adm-table-wrap">
         <table className="adm-table">
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last sign-in</th></tr></thead>
+          <thead><tr>
+            <SortHeader label="Name" field="full_name" {...table.sortProps} />
+            <SortHeader label="Email" field="email" {...table.sortProps} />
+            <SortHeader label="Role" field="role" {...table.sortProps} />
+            <SortHeader label="Status" field="is_active" {...table.sortProps} />
+            <SortHeader label="Last sign-in" field="last_login_at" {...table.sortProps} />
+          </tr></thead>
           <tbody>
             <StateRow state={list} cols={5} />
-            {(list.data || []).map((u) => (
+            {list.data && !rows.length && needle && <tr><td colSpan={5} className="adm-muted">No staff match “{q}”.</td></tr>}
+            {(page?.items || []).map((u) => (
               <tr key={u.id} className="adm-row-link" tabIndex={0} onClick={() => start(u)} onKeyDown={(e) => { if (e.key === 'Enter') start(u); }}>
                 <td>{u.full_name}{u.id === me.id && <span className="adm-muted"> (you)</span>}</td><td>{u.email}</td>
                 <td><Badge value={u.role} /></td><td><Badge value={u.is_active ? 'active' : 'disabled'} /></td>
@@ -46,6 +77,7 @@ export default function Users() {
           </tbody>
         </table>
       </div>
+      <Pager page={page} {...table.pagerProps} />
 
       {open && (
         <Drawer title={open === 'new' ? 'New staff user' : open.email} onClose={() => setOpen(null)}>

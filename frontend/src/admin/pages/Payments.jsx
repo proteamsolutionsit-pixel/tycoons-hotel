@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { dateTime, rupees } from '../../utils/format';
-import { Badge, PageTitle, Pager, SearchBox, SortHeader, StateRow, useAdminList } from '../ui';
+import { Badge, ExportButton, PAGE_SIZES, PageTitle, Pager, SearchBox, SortHeader, StateRow, useAdminList } from '../ui';
 
 const STATUSES = ['', 'created', 'authorized', 'captured', 'failed', 'refund_pending', 'refunded'];
 
@@ -11,7 +11,9 @@ export default function Payments() {
   const sort = params.get('sort') || 'created_at';
   const order = params.get('order') || 'desc';
   const offset = Number(params.get('offset') || 0);
-  const list = useAdminList('/api/v1/admin/payments', { status, q, sort, order, offset, limit: 25 });
+  const limit = PAGE_SIZES.includes(Number(params.get('limit'))) ? Number(params.get('limit')) : 25;
+  const filters = { status, q, sort, order };
+  const list = useAdminList('/api/v1/admin/payments', { ...filters, offset, limit });
   const update = (changes) => {
     const p = new URLSearchParams(params);
     Object.entries(changes).forEach(([k, v]) => (v ? p.set(k, v) : p.delete(k)));
@@ -22,7 +24,9 @@ export default function Payments() {
 
   return (
     <>
-      <PageTitle title="Payments" subtitle="Razorpay orders, captures and refunds. No card details are stored." />
+      <PageTitle title="Payments" subtitle="Razorpay orders, captures and refunds. No card details are stored.">
+        <ExportButton path="/api/v1/admin/payments/export" query={filters} />
+      </PageTitle>
       <div className="adm-toolbar" role="search">
         <SearchBox value={q} onChange={(v) => update({ q: v })} placeholder="Order / payment id, reference or guest" />
         <select className="adm-input" value={status} onChange={(e) => update({ status: e.target.value })} aria-label="Status">
@@ -32,7 +36,9 @@ export default function Payments() {
       <div className="adm-table-wrap">
         <table className="adm-table">
           <thead><tr>
-            <th>Booking</th><th>Guest</th><th>Razorpay order</th><th>Payment / refund</th>
+            <SortHeader label="Booking" field="reference" {...sortProps} />
+            <SortHeader label="Guest" field="guest" {...sortProps} />
+            <th>Razorpay order</th><th>Payment / refund</th>
             <SortHeader label="Amount" field="amount" {...sortProps} />
             <SortHeader label="Status" field="status" {...sortProps} />
             <SortHeader label="Captured" field="captured_at" {...sortProps} />
@@ -55,7 +61,7 @@ export default function Payments() {
           </tbody>
         </table>
       </div>
-      <Pager page={list.data} onChange={(o) => update({ offset: String(o) })} />
+      <Pager page={list.data} limits={PAGE_SIZES} onChange={(o) => update({ offset: String(o) })} onLimit={(n) => update({ limit: String(n) })} />
     </>
   );
 }

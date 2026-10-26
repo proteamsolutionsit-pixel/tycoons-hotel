@@ -177,3 +177,65 @@ describe('pageWindow', () => {
     expect(pageWindow(1, 10)).toEqual([1, 2, null, 10]);
   });
 });
+
+describe('Data tables across the admin', () => {
+  const ADMIN = { ...STAFF, id: 1, role: 'admin', permissions: [...STAFF.permissions, 'users.manage', 'data.export'] };
+  const mount = (path, me, handler) => {
+    const calls = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const u = String(url);
+      if (u.includes('/auth/me')) return json(200, me);
+      calls.push(new URL(u, 'http://x'));
+      return handler(u);
+    });
+    render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/admin/*" element={<AdminApp />} /></Routes></MemoryRouter>);
+    return calls;
+  };
+  const sub = (id, name) => ({ id, name, email: `${name}@x.in`, topic: 'Other', kind: 'contact', message: 'hi', status: 'new', created_at: '2026-10-26T04:00:00' });
+
+  it('guest requests: sortable, page size, export for admins only', async () => {
+    const user = userEvent.setup();
+    const calls = mount('/admin/submissions?tab=enquiries', ADMIN, () => json(200, { items: [sub(1, 'amit'), sub(2, 'bina')], total: 60, limit: 25, offset: 0 }));
+    expect(await screen.findByText('amit')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Export CSV' }).getAttribute('href')).toBe('/api/v1/admin/submissions/enquiries/export?sort=created_at&order=desc');
+    await user.click(screen.getByRole('button', { name: /^From/ }));
+    expect(calls.at(-1).searchParams.get('sort')).toBe('name');
+    await user.selectOptions(screen.getByLabelText('Rows per page'), '50');
+    expect(calls.at(-1).searchParams.get('limit')).toBe('50');
+  });
+
+  it('staff see no export button', async () => {
+    mount('/admin/submissions?tab=enquiries', STAFF, () => json(200, { items: [sub(1, 'amit')], total: 1, limit: 25, offset: 0 }));
+    expect(await screen.findByText('amit')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Export CSV' })).not.toBeInTheDocument();
+  });
+
+  it('staff users: searches and sorts in the browser', async () => {
+    const user = userEvent.setup();
+    const users = [
+      { id: 1, email: 'zed@x.in', full_name: 'Zed Admin', role: 'admin', is_active: true, last_login_at: null, created_at: '2026-10-01T00:00:00' },
+      { id: 2, email: 'amy@x.in', full_name: 'Amy Desk', role: 'staff', is_active: true, last_login_at: null, created_at: '2026-10-01T00:00:00' },
+    ];
+    mount('/admin/users', ADMIN, () => json(200, users));
+    await screen.findByText('Amy Desk');
+    const names = () => screen.getAllByRole('row').slice(1).map((r) => r.cells[0].textContent.replace(' (you)', ''));
+    expect(names()).toEqual(['Amy Desk', 'Zed Admin']);
+    await user.click(screen.getByRole('button', { name: /^Name/ }));      // already ascending -> descending
+    expect(names()).toEqual(['Zed Admin', 'Amy Desk']);
+    await user.type(screen.getByPlaceholderText('Name, email or role'), 'staff');
+    expect(await screen.findByText('1 total')).toBeInTheDocument();
+    expect(names()).toEqual(['Amy Desk']);
+  });
+});
+
+describe('csvCell', () => {
+  it('quotes and defuses formulas', async () => {
+    const { csvCell, toCsv } = await import('../utils/csv');
+    expect(csvCell('=SUM(A1)')).toBe("'=SUM(A1)");
+    expect(csvCell('a,b')).toBe('"a,b"');
+    expect(csvCell('say "hi"')).toBe('"say ""hi"""');
+    expect(csvCell(true)).toBe('yes');
+    expect(csvCell(null)).toBe('');
+    expect(toCsv(['a', 'b'], [[1, 'x']])).toBe('a,b\r\n1,x');
+  });
+});

@@ -107,6 +107,35 @@ export function Pager({ page, onChange, onLimit, limits = [25, 50, 100] }) {
   );
 }
 
+export const PAGE_SIZES = [25, 50, 100, 200];
+
+/**
+ * Table state kept in the component (for tables inside tabs): search, sort,
+ * page size and offset. Any change except paging returns to the first page.
+ */
+export function useTableState(initial = {}) {
+  const [state, setState] = useState({ q: '', sort: '', order: 'desc', limit: 25, offset: 0, ...initial });
+  const set = (changes) => setState((s) => ({ ...s, ...changes, offset: 'offset' in changes ? changes.offset : 0 }));
+  return {
+    state,
+    set,
+    sortProps: { sort: state.sort, order: state.order, onSort: (sort, order) => set({ sort, order }) },
+    pagerProps: { limits: PAGE_SIZES, onChange: (offset) => set({ offset }), onLimit: (limit) => set({ limit }) },
+  };
+}
+
+/** "Export CSV" link for the rows matching `query`; shown only with the permission. */
+export function ExportButton({ path, query = {}, permission = 'data.export', label = 'Export CSV' }) {
+  const { can } = useAuth();
+  if (!can(permission)) return null;
+  const qs = new URLSearchParams(Object.entries(query).filter(([k, v]) => v !== '' && v !== null && v !== undefined
+    && k !== 'limit' && k !== 'offset')).toString();
+  return (
+    <a className="adm-btn adm-btn--ghost" href={`${path}${qs ? `?${qs}` : ''}`} download
+      title="Download the rows matching the current search and filters (up to 10,000)">{label}</a>
+  );
+}
+
 /** Loading / error / empty rows for a table body. */
 export function StateRow({ state, cols, empty = 'Nothing here yet.' }) {
   if (state.loading && !state.data) {

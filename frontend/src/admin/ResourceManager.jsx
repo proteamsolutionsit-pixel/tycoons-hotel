@@ -1,11 +1,13 @@
 /* Generic list + edit drawer for simple admin tables (room types, spa
    treatments, content cards, gallery, job openings). Editing controls appear
-   only with `managePermission`; the API enforces it regardless. */
+   only with `managePermission`; the API enforces it regardless.
+   Columns: { label, key?, render?, money?, sort? } - a column with `key` (or
+   `sort`, the field name for render-only columns) gets a sortable header. */
 import { useState } from 'react';
 import { api, ApiError } from '../services/api';
 import { rupees } from '../utils/format';
 import { useAuth } from './auth';
-import { ConfirmDialog, Drawer, Notice, Pager, StateRow, useAdminList, useToast } from './ui';
+import { ConfirmDialog, Drawer, ExportButton, Notice, Pager, SearchBox, SortHeader, StateRow, useAdminList, useTableState, useToast } from './ui';
 
 function toForm(fields, item) {
   const v = {};
@@ -93,8 +95,10 @@ export default function ResourceManager({ endpoint, fields, columns, noun, query
   const { can, handleError } = useAuth();
   const toast = useToast();
   const canManage = can(managePermission);
-  const [offset, setOffset] = useState(0);
-  const list = useAdminList(endpoint, { ...query, limit: 50, offset });
+  const table = useTableState({ sort: '', order: 'asc', limit: 50 });
+  const { q, sort, order, limit, offset } = table.state;
+  const filters = { ...query, q, sort, order };
+  const list = useAdminList(endpoint, { ...filters, limit, offset });
   const [editing, setEditing] = useState(null); // {item|null}
   const [values, setValues] = useState({});
   const [errors, setErrors] = useState({});
@@ -141,10 +145,18 @@ export default function ResourceManager({ endpoint, fields, columns, noun, query
   const items = list.data?.items || [];
   return (
     <>
-      {canManage && <div className="adm-toolbar"><button type="button" className="adm-btn" onClick={() => open(null)}>New {noun.toLowerCase()}</button></div>}
+      <div className="adm-toolbar">
+        <SearchBox value={q} onChange={(v) => table.set({ q: v })} placeholder={`Search ${noun.toLowerCase()}s`} />
+        <span className="adm-toolbar__end adm-btn-row">
+          <ExportButton path={`${endpoint}/export`} query={filters} />
+          {canManage && <button type="button" className="adm-btn" onClick={() => open(null)}>New {noun.toLowerCase()}</button>}
+        </span>
+      </div>
       <div className="adm-table-wrap">
         <table className="adm-table">
-          <thead><tr>{columns.map((c) => <th key={c.label}>{c.label}</th>)}</tr></thead>
+          <thead><tr>{columns.map((c) => (c.sort || c.key
+            ? <SortHeader key={c.label} label={c.label} field={c.sort || c.key} {...table.sortProps} />
+            : <th key={c.label}>{c.label}</th>))}</tr></thead>
           <tbody>
             <StateRow state={list} cols={columns.length} empty={`No ${noun.toLowerCase()}s yet.`} />
             {items.map((it) => (
@@ -156,7 +168,7 @@ export default function ResourceManager({ endpoint, fields, columns, noun, query
           </tbody>
         </table>
       </div>
-      <Pager page={list.data} onChange={setOffset} />
+      <Pager page={list.data} {...table.pagerProps} />
 
       {editing && (
         <Drawer title={editing.item ? (canManage ? `Edit ${noun.toLowerCase()}` : noun) : `New ${noun.toLowerCase()}`} onClose={() => setEditing(null)}>

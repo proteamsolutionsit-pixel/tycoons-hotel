@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import { dateOnly, dateTime, guestsLabel, longDate, rupees, stayRange, timeOnly } from '../../utils/format';
 import { Can, useAuth } from '../auth';
-import { Badge, ConfirmDialog, Drawer, PageTitle, Pager, SearchBox, SortHeader, StateRow, useAdminList, useToast } from '../ui';
+import { Badge, ConfirmDialog, Drawer, ExportButton, PAGE_SIZES, PageTitle, Pager, SearchBox, SortHeader, StateRow, useAdminList, useToast } from '../ui';
 
 const STATUSES = ['', 'pending_payment', 'confirmed', 'payment_review', 'cancelled', 'expired'];
 
@@ -16,10 +16,9 @@ export default function Bookings() {
   const sort = params.get('sort') || 'created_at';
   const order = params.get('order') || 'desc';
   const offset = Number(params.get('offset') || 0);
-  const list = useAdminList('/api/v1/admin/bookings', {
-    status, q, sort, order, offset, limit: 25,
-    check_in_from: params.get('from') || undefined, check_in_to: params.get('to') || undefined,
-  });
+  const limit = PAGE_SIZES.includes(Number(params.get('limit'))) ? Number(params.get('limit')) : 25;
+  const filters = { status, q, sort, order, check_in_from: params.get('from') || undefined, check_in_to: params.get('to') || undefined };
+  const list = useAdminList('/api/v1/admin/bookings', { ...filters, offset, limit });
   const update = (changes) => {
     const p = new URLSearchParams(params);
     Object.entries(changes).forEach(([k, v]) => (v ? p.set(k, v) : p.delete(k)));
@@ -31,7 +30,9 @@ export default function Bookings() {
 
   return (
     <>
-      <PageTitle title="Bookings" subtitle={list.data ? `${list.data.total} matching` : undefined} />
+      <PageTitle title="Bookings" subtitle={list.data ? `${list.data.total} matching` : undefined}>
+        <ExportButton path="/api/v1/admin/bookings/export" query={filters} />
+      </PageTitle>
       <div className="adm-toolbar" role="search">
         <SearchBox value={q} onChange={(v) => update({ q: v })} placeholder="Reference, name, email or phone" />
         <select className="adm-input" value={status} onChange={(e) => update({ status: e.target.value })} aria-label="Status">
@@ -69,7 +70,7 @@ export default function Bookings() {
           </tbody>
         </table>
       </div>
-      <Pager page={list.data} onChange={(o) => update({ offset: String(o) })} />
+      <Pager page={list.data} limits={PAGE_SIZES} onChange={(o) => update({ offset: String(o) })} onLimit={(n) => update({ limit: String(n) })} />
       {id && <BookingDetail id={id} onClose={() => navigate(`/admin/bookings?${params}`)} onChanged={list.reload} />}
     </>
   );
