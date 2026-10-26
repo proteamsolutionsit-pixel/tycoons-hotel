@@ -136,3 +136,44 @@ describe('Payment gateway settings', () => {
     expect(screen.getByLabelText('Key Secret').value).toBe('');      // never echoed back
   });
 });
+
+describe('Audit log table', () => {
+  const ADMIN = { ...STAFF, id: 1, role: 'admin', permissions: [...STAFF.permissions, 'audit.view'] };
+  const entry = (id) => ({ id, occurred_at: '2026-10-26T04:00:00', actor_type: 'admin', actor_id: 1, actor_email: `user${id}@example.com`,
+    action: 'auth.login', resource_type: 'admin_user', resource_id: '1', outcome: 'success', ip: '10.0.0.1', request_id: 'r', details: null });
+
+  it('sorts, pages and exports through the server with the current filters', async () => {
+    const user = userEvent.setup();
+    const calls = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const u = String(url);
+      if (u.includes('/auth/me')) return json(200, ADMIN);
+      if (u.includes('/audit-logs')) {
+        calls.push(new URL(u, 'http://x').searchParams);
+        return json(200, { items: [entry(1), entry(2)], total: 120, limit: 50, offset: 0 });
+      }
+      return json(404, { error: { code: 'not_found', message: 'nope' } });
+    });
+    render(<MemoryRouter initialEntries={['/admin/audit?outcome=failure']}><Routes><Route path="/admin/*" element={<AdminApp />} /></Routes></MemoryRouter>);
+    expect(await screen.findByText('user1@example.com')).toBeInTheDocument();
+    expect(screen.getByText('1–50 of 120')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Export CSV' })).toHaveAttribute('href', '/api/v1/admin/audit-logs/export?outcome=failure&sort=occurred_at&order=desc');
+
+    await user.click(screen.getByRole('button', { name: /Actor/ }));
+    expect(calls.at(-1).get('sort')).toBe('actor');
+    await user.click(screen.getByRole('button', { name: 'Page 3' }));
+    expect(calls.at(-1).get('offset')).toBe('100');
+    await user.selectOptions(screen.getByLabelText('Rows per page'), '100');
+    expect(calls.at(-1).get('limit')).toBe('100');
+    expect(calls.at(-1).get('offset')).toBe('0');           // new page size starts from the top
+  });
+});
+
+describe('pageWindow', () => {
+  it('keeps first, last and neighbours, with gaps', async () => {
+    const { pageWindow } = await import('../admin/ui');
+    expect(pageWindow(1, 3)).toEqual([1, 2, 3]);
+    expect(pageWindow(5, 10)).toEqual([1, null, 4, 5, 6, null, 10]);
+    expect(pageWindow(1, 10)).toEqual([1, 2, null, 10]);
+  });
+});

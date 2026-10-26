@@ -140,7 +140,15 @@ th[aria-sort="ascending"] .adm-sort, th[aria-sort="descending"] .adm-sort { colo
 @keyframes adm-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .adm-skeleton { animation: none; } }
 
-.adm-pager { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 12px; font-size: 0.875rem; color: var(--c-text-muted); }
+.adm-pager { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; font-size: 0.875rem; color: var(--c-text-muted); }
+.adm-pager__size { display: inline-flex; align-items: center; gap: 8px; margin-right: auto; }
+.adm-pager__gap { padding: 0 2px; }
+.adm-pager .adm-btn--sm { min-width: 34px; padding: 0 10px; }
+.adm-pager__current { cursor: default; }
+.adm-input--sm { width: auto; min-height: 34px; padding: 0 8px; font-size: 0.8125rem; }
+.adm-toolbar__dates { display: inline-flex; align-items: center; gap: 8px; color: var(--c-text-muted); font-size: 0.875rem; }
+.adm-toolbar__dates .adm-input { width: auto; }
+.adm-toolbar__end { margin-left: auto; }
 
 /* -- Badges (label always shown; colour is reinforcement) --------------------------------- */
 .adm-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 500; text-transform: capitalize; white-space: nowrap; }

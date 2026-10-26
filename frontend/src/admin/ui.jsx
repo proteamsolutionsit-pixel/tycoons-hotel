@@ -65,14 +65,44 @@ export function SortHeader({ label, field, sort, order, onSort }) {
   );
 }
 
-export function Pager({ page, onChange }) {
-  if (!page || page.total <= page.limit) return page && page.total ? <div className="adm-pager"><span>{page.total} total</span></div> : null;
+/** Page numbers to show: first, last, and a window around the current page; null = gap. */
+export function pageWindow(current, count, radius = 1) {
+  const pages = [];
+  for (let p = 1; p <= count; p += 1) {
+    if (p === 1 || p === count || Math.abs(p - current) <= radius) pages.push(p);
+    else if (pages[pages.length - 1] !== null) pages.push(null);
+  }
+  return pages;
+}
+
+/**
+ * Pagination. With onLimit it also offers a rows-per-page choice (`limits`).
+ * Shows "1–25 of 312", numbered pages, Previous/Next.
+ */
+export function Pager({ page, onChange, onLimit, limits = [25, 50, 100] }) {
+  if (!page || !page.total) return null;
   const { total, limit, offset } = page;
+  const current = Math.floor(offset / limit) + 1;
+  const count = Math.ceil(total / limit);
+  const sizeSelect = onLimit && (
+    <label className="adm-pager__size">Rows per page
+      <select className="adm-input adm-input--sm" value={limit} onChange={(e) => onLimit(Number(e.target.value))}>
+        {limits.map((n) => <option key={n} value={n}>{n}</option>)}
+      </select>
+    </label>
+  );
+  if (count <= 1) return <div className="adm-pager">{sizeSelect}<span>{total} total</span></div>;
+  const go = (p) => onChange((p - 1) * limit);
   return (
     <nav className="adm-pager" aria-label="Pagination">
+      {sizeSelect}
       <span>{offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
-      <button type="button" className="adm-btn adm-btn--ghost adm-btn--sm" disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - limit))}>Previous</button>
-      <button type="button" className="adm-btn adm-btn--ghost adm-btn--sm" disabled={offset + limit >= total} onClick={() => onChange(offset + limit)}>Next</button>
+      <button type="button" className="adm-btn adm-btn--ghost adm-btn--sm" disabled={current === 1} onClick={() => go(current - 1)}>Previous</button>
+      {pageWindow(current, count).map((p, i) => (p === null
+        ? <span key={`gap${i}`} className="adm-pager__gap" aria-hidden="true">…</span>
+        : <button key={p} type="button" className={'adm-btn adm-btn--sm ' + (p === current ? 'adm-pager__current' : 'adm-btn--ghost')}
+            aria-current={p === current ? 'page' : undefined} aria-label={`Page ${p}`} onClick={() => p !== current && go(p)}>{p}</button>))}
+      <button type="button" className="adm-btn adm-btn--ghost adm-btn--sm" disabled={current === count} onClick={() => go(current + 1)}>Next</button>
     </nav>
   );
 }
@@ -103,6 +133,7 @@ export function StateRow({ state, cols, empty = 'Nothing here yet.' }) {
 
 export function SearchBox({ value, onChange, placeholder = 'Search' }) {
   const [v, setV] = useState(value || '');
+  useEffect(() => setV(value || ''), [value]);   // follow outside changes, e.g. "Clear filters"
   useEffect(() => {
     const t = setTimeout(() => { if (v !== (value || '')) onChange(v); }, 350);
     return () => clearTimeout(t);

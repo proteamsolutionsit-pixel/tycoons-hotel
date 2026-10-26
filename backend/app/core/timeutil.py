@@ -25,6 +25,12 @@ def hotel_today() -> date:
     return datetime.now(hotel_tz()).date()
 
 
+def hotel_day_start_utc(day: date) -> datetime:
+    """Midnight at the hotel on `day`, as naive UTC (for filtering DATETIME columns)."""
+    local = datetime(day.year, day.month, day.day, tzinfo=hotel_tz())
+    return local.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def to_aware_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
