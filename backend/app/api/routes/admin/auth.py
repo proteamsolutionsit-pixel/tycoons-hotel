@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import Principal, get_principal
 from app.core.config import get_settings
-from app.core.permissions import permissions_for
+from app.core.permissions import user_permissions
 from app.core.rate_limit import enforce
 from app.core.security import CSRF_COOKIE, SESSION_COOKIE
 from app.db.session import get_db
@@ -38,7 +38,7 @@ def _clear_cookies(response: Response) -> None:
 
 def _me(user) -> MeOut:
     return MeOut.model_validate(user).model_copy(
-        update={"permissions": sorted(p.value for p in permissions_for(user.role))})
+        update={"permissions": sorted(p.value for p in user_permissions(user))})
 
 
 @router.post("/login", response_model=MeOut, summary="Sign in (rate limited per IP and per account)")

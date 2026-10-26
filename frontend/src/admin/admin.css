@@ -308,3 +308,15 @@ a.adm-stat:hover { border-color: var(--c-accent); }
 @media (prefers-reduced-motion: reduce) {
   .adm-side, .adm-drawer__panel, .adm-modal__panel, .adm-toast { transition: none; animation: none; }
 }
+
+/* Roles & access: permission checklist */
+.adm-perms { border: 1px solid var(--a-line); border-radius: var(--a-radius); padding: 12px 14px 6px; margin: 0; }
+.adm-perms > legend { display: flex; gap: 12px; align-items: baseline; padding: 0 6px; font-family: var(--f-display); font-size: 1.15rem; color: var(--c-heading); }
+.adm-perms > legend .adm-link { font-family: inherit; font-size: 0.8125rem; }
+.adm-perm { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 8px 6px; border-radius: var(--a-radius-sm); cursor: pointer; }
+.adm-perm:hover { background: var(--a-bg); }
+.adm-perm input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--c-brand); }
+.adm-perm > span { display: grid; gap: 2px; }
+.adm-perm strong { font-weight: 500; }
+.adm-perm small { font-size: 0.8125rem; }
+@media (min-width: 900px) { .adm-perms { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; } .adm-perms > legend { grid-column: 1 / -1; } }

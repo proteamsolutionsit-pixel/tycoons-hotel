@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { downloadCsv } from '../../utils/csv';
 import { dateTime } from '../../utils/format';
@@ -6,19 +7,20 @@ import { useAuth } from '../auth';
 import { Badge, Drawer, Notice, PageTitle, Pager, SearchBox, SortHeader, StateRow, useAdminList, useTableState } from '../ui';
 
 const SORT_VALUE = {
-  full_name: (u) => u.full_name.toLowerCase(), email: (u) => u.email.toLowerCase(), role: (u) => u.role,
+  full_name: (u) => u.full_name.toLowerCase(), email: (u) => u.email.toLowerCase(), role: (u) => u.role_name.toLowerCase(),
   is_active: (u) => (u.is_active ? 1 : 0), last_login_at: (u) => u.last_login_at || '',
 };
 
 export default function Users() {
   const { user: me, handleError, can } = useAuth();
   const list = useAdminList('/api/v1/admin/users');
+  const roles = useAdminList('/api/v1/admin/roles');
   // The staff list is small and loaded whole, so search/sort/paging happen here
   const table = useTableState({ sort: 'full_name', order: 'asc' });
   const { q, sort, order, limit, offset } = table.state;
   const needle = q.trim().toLowerCase();
   const rows = (list.data || [])
-    .filter((u) => !needle || [u.full_name, u.email, u.role].some((v) => String(v).toLowerCase().includes(needle)))
+    .filter((u) => !needle || [u.full_name, u.email, u.role_name].some((v) => String(v).toLowerCase().includes(needle)))
     .sort((a, b) => {
       const x = SORT_VALUE[sort](a);
       const y = SORT_VALUE[sort](b);
@@ -26,7 +28,7 @@ export default function Users() {
     });
   const page = list.data ? { items: rows.slice(offset, offset + limit), total: rows.length, limit, offset } : null;
   const exportCsv = () => downloadCsv('staff-users', ['name', 'email', 'role', 'active', 'last_sign_in_utc', 'created_at_utc'],
-    rows.map((u) => [u.full_name, u.email, u.role, u.is_active, u.last_login_at, u.created_at]));
+    rows.map((u) => [u.full_name, u.email, u.role_name, u.is_active, u.last_login_at, u.created_at]));
   const [open, setOpen] = useState(null); // 'new' | user
   const [notice, setNotice] = useState(null);
   const [form, setForm] = useState({});
@@ -35,8 +37,9 @@ export default function Users() {
   const start = (u) => {
     setOpen(u);
     setNotice(null);
-    setForm(u === 'new' ? { email: '', full_name: '', role: 'staff', password: '' }
-      : { full_name: u.full_name, role: u.role, is_active: u.is_active, new_password: '' });
+    const fallback = (roles.data || []).find((r) => r.key === 'front_desk')?.id ?? '';
+    setForm(u === 'new' ? { email: '', full_name: '', role_id: String(fallback), password: '' }
+      : { full_name: u.full_name, role_id: String(u.role_id ?? ''), is_active: u.is_active, new_password: '' });
   };
 
   const run = async (fn, msg, close = true) => {
@@ -53,7 +56,7 @@ export default function Users() {
         <button type="button" className="adm-btn" onClick={() => start('new')}>New user</button>
       </PageTitle>
       {!open && <Notice notice={notice} onClose={() => setNotice(null)} />}
-      <p className="adm-muted"><strong>Admin</strong>: everything. <strong>Staff</strong>: read bookings and payments, handle guest requests.</p>
+      <p className="adm-muted">What each user can see and do comes from their role.{can('roles.manage') && <> Define roles under <Link to="/admin/roles">Roles &amp; access</Link>.</>}</p>
       <div className="adm-toolbar"><SearchBox value={q} onChange={(v) => table.set({ q: v })} placeholder="Name, email or role" /></div>
       <div className="adm-table-wrap">
         <table className="adm-table">
@@ -70,7 +73,7 @@ export default function Users() {
             {(page?.items || []).map((u) => (
               <tr key={u.id} className="adm-row-link" tabIndex={0} onClick={() => start(u)} onKeyDown={(e) => { if (e.key === 'Enter') start(u); }}>
                 <td>{u.full_name}{u.id === me.id && <span className="adm-muted"> (you)</span>}</td><td>{u.email}</td>
-                <td><Badge value={u.role} /></td><td><Badge value={u.is_active ? 'active' : 'disabled'} /></td>
+                <td><span className={`adm-badge adm-badge--${u.role === 'admin' ? 'brand' : 'neutral'}`} style={{ textTransform: 'none' }}>{u.role_name}</span></td><td><Badge value={u.is_active ? 'active' : 'disabled'} /></td>
                 <td className="adm-muted">{dateTime(u.last_login_at) || 'Never'}</td>
               </tr>
             ))}
@@ -83,19 +86,23 @@ export default function Users() {
         <Drawer title={open === 'new' ? 'New staff user' : open.email} onClose={() => setOpen(null)}>
           <Notice notice={notice} />
           {open === 'new' ? (
-            <form className="adm-form" onSubmit={(e) => { e.preventDefault(); run(() => api.post('/api/v1/admin/users', form), 'User created.'); }}>
+            <form className="adm-form" onSubmit={(e) => { e.preventDefault(); run(() => api.post('/api/v1/admin/users', { ...form, role_id: Number(form.role_id) }), 'User created.'); }}>
               <div className="adm-field adm-field--wide"><label htmlFor="u-email">Email</label><input id="u-email" className="adm-input" type="email" required value={form.email} onChange={set('email')} /></div>
               <div className="adm-field"><label htmlFor="u-name">Full name</label><input id="u-name" className="adm-input" required value={form.full_name} onChange={set('full_name')} /></div>
-              <div className="adm-field"><label htmlFor="u-role">Role</label><select id="u-role" className="adm-input" value={form.role} onChange={set('role')}><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
+              <div className="adm-field"><label htmlFor="u-role">Role</label><select id="u-role" className="adm-input" required value={form.role_id} onChange={set('role_id')}>
+                {(roles.data || []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select></div>
               <div className="adm-field adm-field--wide"><label htmlFor="u-pw">Initial password</label><input id="u-pw" className="adm-input" type="password" autoComplete="new-password" required value={form.password} onChange={set('password')} />
                 <small className="adm-muted">At least 12 characters with upper- and lowercase letters and a number.</small></div>
               <div className="adm-form__actions"><button className="adm-btn" type="submit" disabled={busy}>Create user</button></div>
             </form>
           ) : (
             <>
-              <form className="adm-form" onSubmit={(e) => { e.preventDefault(); run(() => api.patch(`/api/v1/admin/users/${open.id}`, { full_name: form.full_name, role: form.role, is_active: form.is_active }), 'User updated.'); }}>
+              <form className="adm-form" onSubmit={(e) => { e.preventDefault(); run(() => api.patch(`/api/v1/admin/users/${open.id}`, { full_name: form.full_name, role_id: Number(form.role_id), is_active: form.is_active }), 'User updated.'); }}>
                 <div className="adm-field adm-field--wide"><label htmlFor="u-name2">Full name</label><input id="u-name2" className="adm-input" required value={form.full_name} onChange={set('full_name')} /></div>
-                <div className="adm-field"><label htmlFor="u-role2">Role</label><select id="u-role2" className="adm-input" value={form.role} onChange={set('role')}><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
+                <div className="adm-field"><label htmlFor="u-role2">Role</label><select id="u-role2" className="adm-input" required value={form.role_id} onChange={set('role_id')}>
+                {(roles.data || []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select></div>
                 <div className="adm-field adm-field--check"><label htmlFor="u-active">Account active</label><input id="u-active" type="checkbox" checked={form.is_active} onChange={set('is_active')} /></div>
                 <div className="adm-form__actions"><button className="adm-btn" type="submit" disabled={busy}>Save</button></div>
               </form>

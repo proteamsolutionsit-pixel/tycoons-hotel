@@ -159,6 +159,8 @@ def _empty(db: Session, model) -> bool:
 
 def seed(db: Session) -> dict[str, int]:
     added: dict[str, int] = {}
+    from app.services.role_service import ensure_built_in
+    ensure_built_in(db)   # Administrator + Front desk access roles
     if _empty(db, RoomType):
         for r in ROOMS:
             db.add(RoomType(**ROOM_FACTS, max_adults=2, max_children=1, is_active=True, **{"is_signature": False, **r}))

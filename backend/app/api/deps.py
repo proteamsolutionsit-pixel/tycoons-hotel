@@ -15,7 +15,7 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.errors import Forbidden, Unauthorized
-from app.core.permissions import Permission, has_permission
+from app.core.permissions import Permission, user_can
 from app.core.security import CSRF_HEADER, SESSION_COOKIE, constant_time_equals, sha256_hex
 from app.db.session import get_db
 from app.models import AdminSession, AdminUser
@@ -55,7 +55,7 @@ class _Require:
 
     def __call__(self, request: Request, principal: Principal = Depends(get_principal)) -> AdminUser:
         user = principal.user
-        if not has_permission(user.role, self.permission):
+        if not user_can(user, self.permission):
             audit.record_now(action="security.permission_denied", outcome="denied", actor=user,
                              details={"permission": self.permission.value, "path": request.url.path,
                                       "method": request.method}, request=request)

@@ -4,6 +4,7 @@ from app.models.booking import Booking
 from app.models.content import ContentCard, GalleryImage, JobOpening, SiteSetting, SpaTreatment
 from app.models.payment import Payment, PaymentEvent
 from app.models.payment_settings import PaymentGatewaySettings
+from app.models.role import Role
 from app.models.room import RoomType
 from app.models.security import AdminSession, AuditLog, PasswordResetToken, RateLimitBucket
 from app.models.submissions import Enquiry, JobApplication, NewsletterSubscriber, SpaAppointment, TableReservation
@@ -11,6 +12,6 @@ from app.models.submissions import Enquiry, JobApplication, NewsletterSubscriber
 __all__ = [
     "AdminSession", "AuditLog", "PasswordResetToken", "RateLimitBucket",
     "AdminUser", "Booking", "ContentCard", "Enquiry", "GalleryImage", "JobApplication", "JobOpening",
-    "NewsletterSubscriber", "Payment", "PaymentEvent", "PaymentGatewaySettings", "RoomType", "SiteSetting", "SpaAppointment",
+    "NewsletterSubscriber", "Payment", "PaymentEvent", "PaymentGatewaySettings", "Role", "RoomType", "SiteSetting", "SpaAppointment",
     "SpaTreatment", "TableReservation",
 ]

@@ -43,7 +43,9 @@ class AdminUserOut(ORMModel):
     id: int
     email: str
     full_name: str
-    role: AdminRole
+    role: AdminRole                 # legacy: "admin" exactly when role_name is Administrator
+    role_id: int | None
+    role_name: str
     is_active: bool
     last_login_at: datetime | None
     created_at: datetime
@@ -56,14 +58,50 @@ class MeOut(AdminUserOut):
 class AdminUserCreate(StrictInput):
     email: EmailStr
     full_name: str = Field(min_length=2, max_length=120)
+    # The access role; `role` ("admin"/"staff") is still accepted and means the
+    # built-in Administrator / Front desk roles. role_id wins when both are sent.
+    role_id: int | None = None
     role: AdminRole = AdminRole.STAFF
     password: str = Field(min_length=12, max_length=128)
 
 
 class AdminUserUpdate(StrictInput):
     full_name: str | None = Field(default=None, min_length=2, max_length=120)
+    role_id: int | None = None
     role: AdminRole | None = None
     is_active: bool | None = None
+
+
+# -- Roles & access ------------------------------------------------------------
+class PermissionInfoOut(BaseModel):
+    key: str
+    group: str
+    label: str
+    description: str
+    implies: list[str]
+
+
+class RoleOut(ORMModel):
+    id: int
+    key: str | None
+    name: str
+    description: str | None
+    permissions: list[str]
+    is_system: bool
+    user_count: int = 0
+    updated_at: datetime
+
+
+class RoleIn(StrictInput):
+    name: str = Field(min_length=2, max_length=60)
+    description: str | None = Field(default=None, max_length=255)
+    permissions: list[str] = Field(default_factory=list, max_length=50)
+
+
+class RoleUpdate(StrictInput):
+    name: str | None = Field(default=None, min_length=2, max_length=60)
+    description: str | None = Field(default=None, max_length=255)
+    permissions: list[str] | None = Field(default=None, max_length=50)
 
 
 class PasswordChange(StrictInput):

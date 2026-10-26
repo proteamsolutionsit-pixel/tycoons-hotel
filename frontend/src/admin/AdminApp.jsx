@@ -6,7 +6,7 @@ import './admin.css';
 import { api } from '../services/api';
 import { AuthProvider, RequireAuth, useAuth } from './auth';
 import {
-  IconBed, IconCalendar, IconCard, IconClose, IconDashboard, IconImage, IconInbox, IconKey, IconLogout, IconMenu, IconShield,
+  IconBed, IconCalendar, IconCard, IconClose, IconDashboard, IconImage, IconInbox, IconKey, IconLock, IconLogout, IconMenu, IconShield,
   IconSliders, IconTag, IconUser, IconUsers,
 } from './icons';
 import Account from './pages/Account';
@@ -17,6 +17,7 @@ import Dashboard from './pages/Dashboard';
 import Occupancy from './pages/Occupancy';
 import Payments from './pages/Payments';
 import PaymentSettings from './pages/PaymentSettings';
+import Roles from './pages/Roles';
 import RoomTypes from './pages/RoomTypes';
 import Settings from './pages/Settings';
 import Submissions from './pages/Submissions';
@@ -40,6 +41,7 @@ const NAV = [
   { group: 'Administration', items: [
     ['/admin/payment-gateway', 'Payment gateway', IconKey, 'payments.settings'],
     ['/admin/users', 'Staff users', IconUsers, 'users.manage'],
+    ['/admin/roles', 'Roles & access', IconLock, 'roles.manage'],
     ['/admin/audit', 'Audit log', IconShield, 'audit.view'],
   ] },
 ];
@@ -180,7 +182,17 @@ function Shell() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
-  const guard = (perm, el) => (can(perm) ? el : <Navigate to="/admin" replace />);
+  // Not allowed here: go to the first page the role does allow (not always the dashboard)
+  const home = NAV.flatMap((g) => g.items).find(([, , , perm]) => can(perm))?.[0];
+  const guard = (perm, el) => {
+    if (can(perm)) return el;
+    if (home) return <Navigate to={home} replace />;
+    return (
+      <div className="adm-empty" role="status">
+        <span>Your role doesn’t include any admin pages yet. Ask an administrator to give your role access.</span>
+      </div>
+    );
+  };
 
   return (
     <div className={'adm' + (open ? ' adm--nav-open' : '')}>
@@ -199,7 +211,7 @@ function Shell() {
             onClick={() => setOpen(true)}><IconMenu /></button>
           <span className="adm-top__title">The Tycoons Hotel · Admin</span>
           <div className="adm-top__user">
-            <NavLink to="/admin/account" className="adm-top__account"><IconUser /><span>{user.full_name}<small>{user.role}</small></span></NavLink>
+            <NavLink to="/admin/account" className="adm-top__account"><IconUser /><span>{user.full_name}<small>{user.role_name || user.role}</small></span></NavLink>
             <button type="button" className="adm-btn adm-btn--ghost adm-btn--sm" onClick={logout}><IconLogout width={16} height={16} />Sign out</button>
           </div>
         </header>
@@ -216,6 +228,7 @@ function Shell() {
             <Route path="settings" element={guard('catalog.view', <Settings />)} />
             <Route path="payment-gateway" element={guard('payments.settings', <PaymentSettings />)} />
             <Route path="users" element={guard('users.manage', <Users />)} />
+            <Route path="roles" element={guard('roles.manage', <Roles />)} />
             <Route path="audit" element={guard('audit.view', <AuditLog />)} />
             <Route path="account" element={<Account />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />

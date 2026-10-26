@@ -20,9 +20,10 @@ from app.core.timeutil import utcnow
 from app.db.session import SessionLocal
 from app.models import AdminUser, Booking, Payment
 from app.models.enums import AdminRole, BookingStatus, PaymentStatus
+from app.models.role import ADMINISTRATOR_KEY, FRONT_DESK_KEY
 from app.repositories.bookings import expire_stale_holds
 from app.seed import seed
-from app.services import payment_service, payment_settings_service
+from app.services import payment_service, payment_settings_service, role_service
 from app.services.auth_service import revoke_all
 from app.services.razorpay_gateway import gateway_for
 
@@ -41,15 +42,16 @@ def cmd_create_admin(args) -> int:
         return 1
     email = args.email.strip().lower()
     with SessionLocal() as db:
+        role = role_service.by_key(db, ADMINISTRATOR_KEY if args.role == "admin" else FRONT_DESK_KEY)
         user = db.execute(select(AdminUser).where(func.lower(AdminUser.email) == email)).scalar_one_or_none()
         if user:
             user.password_hash = hash_password(password)
-            user.role = AdminRole(args.role)
+            user.role, user.role_id = AdminRole(args.role), role.id
             user.is_active = True
             revoke_all(db, user.id, "password_reset_cli")
             action = "Updated"
         else:
-            db.add(AdminUser(email=email, full_name=args.name, role=AdminRole(args.role),
+            db.add(AdminUser(email=email, full_name=args.name, role=AdminRole(args.role), role_id=role.id,
                              password_hash=hash_password(password), is_active=True))
             action = "Created"
         db.commit()

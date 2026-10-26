@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import require
 from app.api.tabular import EXPORT_MAX_ROWS, csv_response, like_pattern, ordered, record_export
 from app.core.errors import Forbidden, NotFound
-from app.core.permissions import Permission, has_permission
+from app.core.permissions import Permission, user_can
 from app.db.session import get_db
 from app.models import AdminUser, Booking, Payment, PaymentEvent
 from app.models.enums import BookingStatus, PaymentStatus
@@ -133,7 +133,7 @@ def cancel_booking(booking_id: int, data: CancelIn, request: Request,
                    actor: AdminUser = Depends(require(Permission.BOOKINGS_MANAGE)), db: Session = Depends(get_db),
                    gateway: PaymentGateway | None = Depends(get_gateway)):
     _get(db, booking_id)
-    if data.refund and not has_permission(actor.role, Permission.PAYMENTS_REFUND):
+    if data.refund and not user_can(actor, Permission.PAYMENTS_REFUND):
         audit.record_now(action="security.permission_denied", outcome="denied", actor=actor,
                          details={"permission": Permission.PAYMENTS_REFUND.value, "booking_id": booking_id},
                          request=request)

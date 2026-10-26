@@ -213,16 +213,16 @@ describe('Data tables across the admin', () => {
   it('staff users: searches and sorts in the browser', async () => {
     const user = userEvent.setup();
     const users = [
-      { id: 1, email: 'zed@x.in', full_name: 'Zed Admin', role: 'admin', is_active: true, last_login_at: null, created_at: '2026-10-01T00:00:00' },
-      { id: 2, email: 'amy@x.in', full_name: 'Amy Desk', role: 'staff', is_active: true, last_login_at: null, created_at: '2026-10-01T00:00:00' },
+      { id: 1, email: 'zed@x.in', full_name: 'Zed Admin', role: 'admin', role_id: 1, role_name: 'Administrator', is_active: true, last_login_at: null, created_at: '2026-10-01T00:00:00' },
+      { id: 2, email: 'amy@x.in', full_name: 'Amy Desk', role: 'staff', role_id: 2, role_name: 'Front desk', is_active: true, last_login_at: null, created_at: '2026-10-01T00:00:00' },
     ];
-    mount('/admin/users', ADMIN, () => json(200, users));
+    mount('/admin/users', ADMIN, (u) => json(200, u.includes('/roles') ? [] : users));
     await screen.findByText('Amy Desk');
     const names = () => screen.getAllByRole('row').slice(1).map((r) => r.cells[0].textContent.replace(' (you)', ''));
     expect(names()).toEqual(['Amy Desk', 'Zed Admin']);
     await user.click(screen.getByRole('button', { name: /^Name/ }));      // already ascending -> descending
     expect(names()).toEqual(['Zed Admin', 'Amy Desk']);
-    await user.type(screen.getByPlaceholderText('Name, email or role'), 'staff');
+    await user.type(screen.getByPlaceholderText('Name, email or role'), 'front desk');
     expect(await screen.findByText('1 total')).toBeInTheDocument();
     expect(names()).toEqual(['Amy Desk']);
   });
@@ -237,5 +237,61 @@ describe('csvCell', () => {
     expect(csvCell(true)).toBe('yes');
     expect(csvCell(null)).toBe('');
     expect(toCsv(['a', 'b'], [[1, 'x']])).toBe('a,b\r\n1,x');
+  });
+});
+
+describe('Roles & access', () => {
+  const ADMIN = { ...STAFF, id: 1, role: 'admin', permissions: [...STAFF.permissions, 'users.manage', 'roles.manage'] };
+  const CATALOGUE = [
+    { key: 'payments.view', group: 'Operations', label: 'View payments', description: 'd', implies: [] },
+    { key: 'bookings.view', group: 'Operations', label: 'View bookings & occupancy', description: 'd', implies: [] },
+    { key: 'payments.refund', group: 'Operations', label: 'Issue refunds', description: 'd', implies: ['bookings.view', 'payments.view'] },
+    { key: 'audit.view', group: 'Administration', label: 'Audit log', description: 'd', implies: [] },
+  ];
+  const ROLES = [
+    { id: 1, key: 'administrator', name: 'Administrator', description: 'All', permissions: CATALOGUE.map((p) => p.key), is_system: true, user_count: 1, updated_at: '2026-10-26T00:00:00' },
+    { id: 2, key: 'front_desk', name: 'Front desk', description: 'Desk', permissions: ['bookings.view'], is_system: false, user_count: 3, updated_at: '2026-10-26T00:00:00' },
+  ];
+
+  it('creates a role; ticking an action locks in what it needs', async () => {
+    const user = userEvent.setup();
+    const posted = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, init = {}) => {
+      const u = String(url);
+      if (u.includes('/auth/me')) return json(200, ADMIN);
+      if (u.endsWith('/roles/permissions')) return json(200, CATALOGUE);
+      if (u.endsWith('/roles') && init.method === 'POST') { posted.push(JSON.parse(init.body)); return json(201, { ...ROLES[1], id: 3 }); }
+      if (u.endsWith('/roles')) return json(200, ROLES);
+      return json(404, { error: { code: 'not_found', message: 'nope' } });
+    });
+    render(<MemoryRouter initialEntries={['/admin/roles']}><Routes><Route path="/admin/*" element={<AdminApp />} /></Routes></MemoryRouter>);
+    expect(await screen.findByText('Full access')).toBeInTheDocument();
+    expect(screen.getByText('1 of 4')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Roles & access' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'New role' }));
+    await user.type(screen.getByLabelText('Role name'), 'Finance');
+    await user.click(screen.getByRole('checkbox', { name: /Issue refunds/ }));
+    const view = screen.getByRole('checkbox', { name: /View payments/ });
+    expect(view).toBeChecked();
+    expect(view).toBeDisabled();                       // required by "Issue refunds"
+    expect(screen.getByRole('checkbox', { name: /Audit log/ })).not.toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Create role' }));
+    expect(posted[0].name).toBe('Finance');
+    expect(new Set(posted[0].permissions)).toEqual(new Set(['payments.refund', 'bookings.view', 'payments.view']));
+  });
+
+  it('shows the Administrator role read-only', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const u = String(url);
+      if (u.includes('/auth/me')) return json(200, ADMIN);
+      if (u.endsWith('/roles/permissions')) return json(200, CATALOGUE);
+      return json(200, ROLES);
+    });
+    render(<MemoryRouter initialEntries={['/admin/roles']}><Routes><Route path="/admin/*" element={<AdminApp />} /></Routes></MemoryRouter>);
+    await user.click(await screen.findByText('Administrator'));
+    expect(screen.getByLabelText('Role name')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Save role/ })).not.toBeInTheDocument();
   });
 });

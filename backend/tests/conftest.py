@@ -57,7 +57,7 @@ from app.core.timeutil import hotel_today  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import AdminUser  # noqa: E402
+from app.models import AdminUser, Role  # noqa: E402
 from app.models.enums import AdminRole  # noqa: E402
 from app.seed import seed  # noqa: E402
 from app.services.razorpay_gateway import GatewayError, RazorpayGateway, get_gateway  # noqa: E402
@@ -171,12 +171,13 @@ def _fresh_data(_schema):
             conn.execute(text(f"TRUNCATE TABLE `{t}`"))
         conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
     with SessionLocal() as db:
-        seed(db)
+        seed(db)   # also creates the built-in Administrator / Front desk roles
+        roles = {r.key: r.id for r in db.query(Role).all()}
         db.add_all([
             AdminUser(email="admin@tycoons.example.com", full_name="Test Admin", role=AdminRole.ADMIN,
-                      password_hash=hash_password(ADMIN_PW)),
+                      role_id=roles["administrator"], password_hash=hash_password(ADMIN_PW)),
             AdminUser(email="staff@tycoons.example.com", full_name="Test Staff", role=AdminRole.STAFF,
-                      password_hash=hash_password(STAFF_PW)),
+                      role_id=roles["front_desk"], password_hash=hash_password(STAFF_PW)),
         ])
         db.commit()
     limiter.reset()

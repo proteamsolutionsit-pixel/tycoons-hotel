@@ -103,6 +103,17 @@ Stop the database with `.\scripts\mysql-stop.ps1`.
 
 ---
 
+## Staff roles & access
+
+*Admin → Roles & access* (Administrator only) defines roles and the permissions each one grants, grouped as Operations, Property and Administration; *Admin → Staff users* gives each user one role.
+
+- **Administrator** (built-in) always has every permission, including roles and payment keys; it can't be edited or deleted, and the last active administrator can't be removed or demoted.
+- **Front desk** (built-in) starts with the original staff access; it can be edited but not deleted.
+- Ticking an action also grants what it needs to see (e.g. *Issue refunds* brings *View payments*, *View bookings* and *Manage bookings*).
+- Permissions are read on every request, so a role change applies at once; menu items the role doesn't allow are hidden and the API refuses them (403, logged).
+- No privilege escalation: someone who manages staff can assign only roles within their own access, and can't edit, deactivate or reset the password of a user with more access. Defining roles (`roles.manage`) can never be granted to a custom role.
+- Every role and user change is in the audit log (`role.create/update/delete`, with permissions added/removed).
+
 ## Razorpay
 
 ### From the admin (recommended)

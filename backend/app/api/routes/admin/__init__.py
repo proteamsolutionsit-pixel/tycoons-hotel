@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from app.api.routes.admin import auth, bookings, content, dashboard, payment_settings, submissions, users
+from app.api.routes.admin import auth, bookings, content, dashboard, payment_settings, roles, submissions, users
 
 router = APIRouter(prefix="/admin")
-for module in (auth, dashboard, bookings, payment_settings, content, submissions, users):
+for module in (auth, dashboard, bookings, payment_settings, content, submissions, users, roles):
     router.include_router(module.router)
