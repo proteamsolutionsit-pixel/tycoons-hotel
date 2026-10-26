@@ -44,16 +44,26 @@ def validate_stay(check_in: date, check_out: date) -> int:
     return nights
 
 
-def fits_party(room: RoomType, adults: int, children: int) -> bool:
-    return adults <= room.max_adults and children <= room.max_children
+def fits_party(room: RoomType, adults: int, children: int, rooms: int = 1) -> bool:
+    """The party fits in `rooms` rooms of this type, with at least one adult per room."""
+    return rooms <= adults and adults <= room.max_adults * rooms and children <= room.max_children * rooms
 
 
-def peak_occupancy(stays: list[tuple[date, date]], check_in: date, check_out: date) -> int:
-    """Highest number of rooms taken on any single night of the stay."""
+def rooms_needed(room: RoomType, adults: int, children: int) -> int | None:
+    """Fewest rooms of this type that sleep the party (None if it can't, within the per-booking cap)."""
+    for n in range(1, get_settings().max_rooms_per_booking + 1):
+        if fits_party(room, adults, children, n):
+            return n
+    return None
+
+
+def peak_occupancy(stays, check_in: date, check_out: date) -> int:
+    """Highest number of rooms taken on any single night of the stay.
+    `stays` are (check_in, check_out[, rooms]) tuples; rooms defaults to 1."""
     peak = 0
     night = check_in
     while night < check_out:
-        taken = sum(1 for s_in, s_out in stays if s_in <= night < s_out)
+        taken = sum((s[2] if len(s) > 2 else 1) for s in stays if s[0] <= night < s[1])
         peak = max(peak, taken)
         night += timedelta(days=1)
     return peak
@@ -65,8 +75,9 @@ def available_rooms(db: Session, room: RoomType, check_in: date, check_out: date
     return max(0, room.total_rooms - peak_occupancy(stays, check_in, check_out))
 
 
-def quote(room: RoomType, nights: int, tax_percent: Decimal) -> Quote:
-    subtotal = room.base_rate_paise * nights
+def quote(room: RoomType, nights: int, tax_percent: Decimal, rooms: int = 1) -> Quote:
+    """Nightly rate is per room; the subtotal covers every room for every night."""
+    subtotal = room.base_rate_paise * nights * rooms
     tax = int((Decimal(subtotal) * tax_percent / Decimal(100)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     return Quote(nights=nights, nightly_rate_paise=room.base_rate_paise, subtotal_paise=subtotal,
                  tax_percent=tax_percent, tax_paise=tax, total_paise=subtotal + tax)

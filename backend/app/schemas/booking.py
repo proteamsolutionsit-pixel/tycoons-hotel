@@ -28,7 +28,9 @@ class RoomQuote(BaseModel):
     view_label: str
     occupancy_label: str
     is_signature: bool
-    fits_party: bool
+    fits_party: bool              # fits in a single room
+    room_count: int               # rooms of this type the party needs (the price covers all of them)
+    max_rooms: int                # most rooms of this type bookable now (free rooms, capped per booking)
     available_rooms: int
     bookable: bool
     nights: int
@@ -51,6 +53,8 @@ class AvailabilityResult(BaseModel):
 
 class BookingCreate(StaySearch):
     room_type_slug: str = Field(min_length=1, max_length=60)
+    # Rooms of that type; defaults to the fewest that sleep the party
+    room_count: int | None = Field(default=None, ge=1, le=10)
     guest_name: PersonName
     guest_email: EmailStr = Field(max_length=255)
     guest_phone: Phone
@@ -90,6 +94,7 @@ class BookingPublic(ORMModel):
     status: BookingStatus
     room_type_slug: str
     room_type_name: str
+    room_count: int = 1
     room_image_url: str
     check_in: date
     check_out: date

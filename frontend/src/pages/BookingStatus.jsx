@@ -142,7 +142,7 @@ export default function BookingStatus() {
               </div>
               <dl className="contact-list">
                 <div><dt>Reference</dt><dd>{booking.reference}</dd></div>
-                <div><dt>Room</dt><dd>{booking.room_type_name}</dd></div>
+                <div><dt>Room</dt><dd>{booking.room_count > 1 ? `${booking.room_count} × ${booking.room_type_name}` : booking.room_type_name}</dd></div>
                 <div><dt>Check-in</dt><dd>{longDate(booking.check_in)}</dd></div>
                 <div><dt>Check-out</dt><dd>{longDate(booking.check_out)} · {plural(booking.nights, 'night')}</dd></div>
                 <div><dt>Guests</dt><dd>{guestsLabel(booking.adults, booking.children)}</dd></div>

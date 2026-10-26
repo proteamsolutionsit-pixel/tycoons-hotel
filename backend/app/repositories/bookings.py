@@ -35,9 +35,10 @@ def lock(db: Session, booking_id: int) -> Booking:
 
 
 def overlapping_stays(db: Session, room_type_id: int, check_in: date, check_out: date, now: datetime,
-                      exclude_booking_id: int | None = None) -> list[tuple[date, date]]:
-    """Stays of this room type that overlap [check_in, check_out) and hold a room."""
-    stmt = select(Booking.check_in, Booking.check_out).where(
+                      exclude_booking_id: int | None = None) -> list[tuple[date, date, int]]:
+    """Stays of this room type that overlap [check_in, check_out) and hold rooms,
+    as (check_in, check_out, rooms held)."""
+    stmt = select(Booking.check_in, Booking.check_out, Booking.room_count).where(
         Booking.room_type_id == room_type_id,
         Booking.check_in < check_out,
         Booking.check_out > check_in,
@@ -48,16 +49,16 @@ def overlapping_stays(db: Session, room_type_id: int, check_in: date, check_out:
     )
     if exclude_booking_id is not None:
         stmt = stmt.where(Booking.id != exclude_booking_id)
-    return [(r.check_in, r.check_out) for r in db.execute(stmt)]
+    return [(r.check_in, r.check_out, r.room_count) for r in db.execute(stmt)]
 
 
 def overlapping_stays_by_room(db: Session, room_type_ids: list[int], check_in: date, check_out: date,
-                              now: datetime) -> dict[int, list[tuple[date, date]]]:
+                              now: datetime) -> dict[int, list[tuple[date, date, int]]]:
     """Same as overlapping_stays for many room types in one query."""
-    out: dict[int, list[tuple[date, date]]] = {rid: [] for rid in room_type_ids}
+    out: dict[int, list[tuple[date, date, int]]] = {rid: [] for rid in room_type_ids}
     if not room_type_ids:
         return out
-    rows = db.execute(select(Booking.room_type_id, Booking.check_in, Booking.check_out).where(
+    rows = db.execute(select(Booking.room_type_id, Booking.check_in, Booking.check_out, Booking.room_count).where(
         Booking.room_type_id.in_(room_type_ids),
         Booking.check_in < check_out,
         Booking.check_out > check_in,
@@ -66,8 +67,8 @@ def overlapping_stays_by_room(db: Session, room_type_ids: list[int], check_in: d
             and_(Booking.status == BookingStatus.PENDING_PAYMENT, Booking.hold_expires_at > now),
         ),
     ))
-    for rid, ci, co in rows:
-        out[rid].append((ci, co))
+    for rid, ci, co, n in rows:
+        out[rid].append((ci, co, n))
     return out
 
 

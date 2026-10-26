@@ -153,6 +153,7 @@ class BookingRow(ORMModel):
     reference: str
     status: BookingStatus
     room_type_name: str
+    room_count: int = 1
     check_in: date
     check_out: date
     nights: int

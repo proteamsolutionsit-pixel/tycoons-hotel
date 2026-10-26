@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     booking_hold_minutes: int = 15
     max_stay_nights: int = 30
     max_advance_days: int = 365
+    max_rooms_per_booking: int = 4      # larger groups: contact reservations
 
     # Files ------------------------------------------------------------------
     storage_dir: Path = BACKEND_DIR / "storage"

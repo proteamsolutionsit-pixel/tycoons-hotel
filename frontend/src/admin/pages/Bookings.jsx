@@ -59,7 +59,7 @@ export default function Bookings() {
               <tr key={b.id} className="adm-row-link" tabIndex={0} onClick={() => open(b)} onKeyDown={(e) => { if (e.key === 'Enter') open(b); }}>
                 <td className="adm-mono">{b.reference}</td>
                 <td>{b.guest_name}<br /><span className="adm-muted">{b.guest_email}</span></td>
-                <td>{b.room_type_name}</td>
+                <td>{b.room_type_name}{b.room_count > 1 && <><br /><span className="adm-muted">× {b.room_count} rooms</span></>}</td>
                 <td className="adm-nowrap" title={`${longDate(b.check_in)} → ${longDate(b.check_out)}`}>{stayRange(b.check_in, b.check_out)}<br /><span className="adm-muted">{b.nights} nt · {guestsLabel(b.adults, b.children)}</span></td>
                 <td className="adm-num">{rupees(b.total_paise)}</td>
                 <td><Badge value={b.status} /></td>
@@ -120,10 +120,10 @@ function BookingDetail({ id, onClose, onChanged }) {
             <section>
               <h3>Stay</h3>
               <dl className="adm-dl">
-                <dt>Room</dt><dd>{b.room_type_name}</dd>
+                <dt>Room</dt><dd>{b.room_count > 1 ? `${b.room_count} × ${b.room_type_name}` : b.room_type_name}</dd>
                 <dt>Dates</dt><dd>{longDate(b.check_in)} → {longDate(b.check_out)} ({b.nights} nights)</dd>
                 <dt>Guests</dt><dd>{guestsLabel(b.adults, b.children)}</dd>
-                <dt>Price</dt><dd>{rupees(b.nightly_rate_paise)} × {b.nights} = {rupees(b.subtotal_paise)}{b.tax_paise ? ` + tax ${rupees(b.tax_paise)} (${Number(b.tax_percent)}%)` : ''}</dd>
+                <dt>Price</dt><dd>{rupees(b.nightly_rate_paise)} × {b.nights}{b.room_count > 1 ? ` × ${b.room_count} rooms` : ''} = {rupees(b.subtotal_paise)}{b.tax_paise ? ` + tax ${rupees(b.tax_paise)} (${Number(b.tax_percent)}%)` : ''}</dd>
               </dl>
             </section>
             <section>

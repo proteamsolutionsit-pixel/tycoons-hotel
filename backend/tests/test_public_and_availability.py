@@ -78,9 +78,15 @@ def test_availability_rejects_bad_dates(client):
     assert r.json()["error"]["code"] == "stay_too_long"
 
 
-def test_party_too_large_is_not_bookable(client):
+def test_party_too_large_for_one_room_is_offered_two(client):
     rooms = client.get("/api/v1/bookings/availability", params={**stay(), "adults": 3}).json()["rooms"]
-    assert all(not r["fits_party"] and not r["bookable"] for r in rooms)
+    assert all(not r["fits_party"] and r["room_count"] == 2 and r["bookable"] for r in rooms)
+
+
+def test_party_no_combination_can_sleep_is_not_bookable(client):
+    # one adult can't take a second room for the children: at least one adult per room
+    rooms = client.get("/api/v1/bookings/availability", params={**stay(), "adults": 1, "children": 3}).json()["rooms"]
+    assert all(not r["bookable"] for r in rooms)
 
 
 def test_peak_occupancy_counts_per_night_not_overlaps():

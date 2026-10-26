@@ -20,7 +20,7 @@ def booking_confirmed(background: BackgroundTasks, b: Booking) -> None:
         f"Your stay at {hotel} is confirmed.",
         "",
         f"Booking reference: {b.reference}",
-        f"Room: {b.room_type.name}",
+        f"Room: {b.room_type.name}" + (f" x {b.room_count}" if b.room_count > 1 else ""),
         f"Check-in: {b.check_in:%A, %d %B %Y}",
         f"Check-out: {b.check_out:%A, %d %B %Y} ({b.nights} night{'s' if b.nights != 1 else ''})",
         f"Guests: {b.adults} adult{'s' if b.adults != 1 else ''}"

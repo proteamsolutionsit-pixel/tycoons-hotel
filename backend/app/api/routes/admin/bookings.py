@@ -43,7 +43,8 @@ _PAYMENT_SORT = {"created_at": Payment.created_at, "amount": Payment.amount_pais
 def _row(b: Booking) -> dict:
     p = booking_repo.latest_payment(b)
     return dict(id=b.id, reference=b.reference, status=b.status, room_type_name=b.room_type.name,
-                check_in=b.check_in, check_out=b.check_out, nights=b.nights, adults=b.adults, children=b.children,
+                room_count=b.room_count, check_in=b.check_in, check_out=b.check_out, nights=b.nights, adults=b.adults,
+                children=b.children,
                 guest_name=b.guest_name, guest_email=b.guest_email, guest_phone=b.guest_phone,
                 total_paise=b.total_paise, currency=b.currency, payment_status=p.status if p else None,
                 created_at=b.created_at)
@@ -110,12 +111,12 @@ def export_bookings(request: Request, filters: dict = Depends(_booking_filters),
     _, sorted_stmt = _booking_query(**filters)
     rows = db.execute(sorted_stmt.options(selectinload(Booking.payments)).limit(EXPORT_MAX_ROWS)).unique().scalars().all()
     record_export(request, actor, "booking", len(rows), filters)
-    header = ["reference", "status", "room", "check_in", "check_out", "nights", "adults", "children", "guest_name",
+    header = ["reference", "status", "room", "rooms", "check_in", "check_out", "nights", "adults", "children", "guest_name",
               "guest_email", "guest_phone", "total_inr", "payment_status", "created_at_utc"]
     out = []
     for b in rows:
         r = _row(b)
-        out.append([r["reference"], r["status"], r["room_type_name"], r["check_in"], r["check_out"], r["nights"],
+        out.append([r["reference"], r["status"], r["room_type_name"], r["room_count"], r["check_in"], r["check_out"], r["nights"],
                     r["adults"], r["children"], r["guest_name"], r["guest_email"], r["guest_phone"],
                     f"{r['total_paise'] / 100:.2f}", r["payment_status"], r["created_at"]])
     return csv_response("bookings", header, out)

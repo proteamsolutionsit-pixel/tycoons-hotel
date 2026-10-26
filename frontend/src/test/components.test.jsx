@@ -78,7 +78,7 @@ describe('BookingBar', () => {
     for (let i = 0; i < 8; i += 1) await user.click(screen.getByRole('button', { name: 'Add adult' }));
     expect(screen.getByRole('button', { name: 'Add adult' })).toBeDisabled();          // server max: 6
     expect(screen.getByRole('group', { name: 'Adults' })).toHaveTextContent('6');
-    expect(await screen.findByText(/Our rooms sleep up to 2 adults, 1 child each/)).toBeInTheDocument();
+    expect(await screen.findByText(/Our rooms sleep up to 2 adults, 1 child each, so/)).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

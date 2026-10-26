@@ -116,7 +116,7 @@ def _mark_captured(db: Session, payment: Payment, entity: dict[str, Any], out: O
         # The hold lapsed before the money arrived: honour it if a room is still free.
         room = db.execute(select(RoomType).where(RoomType.id == booking.room_type_id).with_for_update()).scalar_one()
         if availability.available_rooms(db, room, booking.check_in, booking.check_out, now,
-                                        exclude_booking_id=booking.id) >= 1:
+                                        exclude_booking_id=booking.id) >= booking.room_count:
             _confirm(booking, out)
             out.notes.append("confirmed_after_hold_lapsed")
             return
@@ -487,7 +487,7 @@ def confirm_after_review(db: Session, booking_id: int, note: str, actor: AdminUs
         raise Conflict("This booking has no captured payment.", code="not_paid")
     room = db.execute(select(RoomType).where(RoomType.id == booking.room_type_id).with_for_update()).scalar_one()
     if availability.available_rooms(db, room, booking.check_in, booking.check_out, utcnow(),
-                                    exclude_booking_id=booking.id) < 1:
+                                    exclude_booking_id=booking.id) < booking.room_count:
         db.rollback()
         raise Conflict(f"No {room.name} is free for these dates. Increase inventory or refund the guest.",
                        code="sold_out")

@@ -98,7 +98,8 @@ def test_payments_unavailable_without_keys(client):
 
 
 def test_party_must_fit_room(client, gateway):
-    r = client.post("/api/v1/bookings", json=booking_payload(adults=3))
+    # no number of rooms works: every room needs an adult, and one adult can't take two
+    r = client.post("/api/v1/bookings", json=booking_payload(adults=1, children=3))
     assert r.status_code == 400 and r.json()["error"]["code"] == "party_too_large"
 
 

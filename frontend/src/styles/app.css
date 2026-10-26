@@ -182,3 +182,9 @@
 .guest-picker__count { min-width: 1.5ch; text-align: center; font-variant-numeric: tabular-nums; }
 .guest-picker__note { margin: 0; font-size: var(--t-xs); color: var(--c-accent-ink); line-height: 1.5; }
 .guest-picker__done { justify-self: end; min-height: 40px; }
+
+/* Results: "2 rooms for your party of 4 adults" */
+.quote-rooms {
+  align-self: flex-start; margin: 0; padding: 4px 10px; background: var(--c-bg-alt);
+  border-left: 2px solid var(--c-accent); color: var(--c-accent-ink); font-size: var(--t-xs); letter-spacing: 0.02em;
+}

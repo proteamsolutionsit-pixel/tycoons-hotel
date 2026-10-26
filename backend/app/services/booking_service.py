@@ -49,7 +49,8 @@ def to_public(b: Booking) -> BookingPublic:
     p = booking_repo.latest_payment(b)
     return BookingPublic(
         reference=b.reference, status=b.status, room_type_slug=b.room_type.slug, room_type_name=b.room_type.name,
-        room_image_url=b.room_type.image_url, check_in=b.check_in, check_out=b.check_out, nights=b.nights,
+        room_image_url=b.room_type.image_url, room_count=b.room_count, check_in=b.check_in, check_out=b.check_out,
+        nights=b.nights,
         adults=b.adults, children=b.children, guest_name=b.guest_name, guest_email=b.guest_email,
         guest_phone=b.guest_phone, special_requests=b.special_requests, nightly_rate_paise=b.nightly_rate_paise,
         subtotal_paise=b.subtotal_paise, tax_percent=b.tax_percent, tax_paise=b.tax_paise,
@@ -73,12 +74,15 @@ def search(db: Session, check_in: date, check_out: date, adults: int, children: 
     for room in rooms:
         free = max(0, room.total_rooms - availability.peak_occupancy(stays[room.id], check_in, check_out))
         fits = availability.fits_party(room, adults, children)
-        q = availability.quote(room, nights, tax)
+        needed = availability.rooms_needed(room, adults, children)
+        count = needed or 1
+        q = availability.quote(room, nights, tax, count)
         quotes.append(RoomQuote(
             slug=room.slug, name=room.name, summary=room.summary, image_url=room.image_url,
             image_alt=room.image_alt, size_label=room.size_label, bed_label=room.bed_label,
             view_label=room.view_label, occupancy_label=room.occupancy_label, is_signature=room.is_signature,
-            fits_party=fits, available_rooms=free, bookable=fits and free > 0, nights=nights,
+            fits_party=fits, room_count=count, max_rooms=min(free, get_settings().max_rooms_per_booking),
+            available_rooms=free, bookable=needed is not None and free >= needed, nights=nights,
             nightly_rate_paise=q.nightly_rate_paise, subtotal_paise=q.subtotal_paise, tax_percent=q.tax_percent,
             tax_paise=q.tax_paise, total_paise=q.total_paise, currency=currency,
         ))
@@ -90,7 +94,8 @@ def search(db: Session, check_in: date, check_out: date, adults: int, children: 
 
 def _same_request(b: Booking, data: BookingCreate) -> bool:
     return (b.room_type.slug == data.room_type_slug and b.check_in == data.check_in
-            and b.check_out == data.check_out and b.guest_email.lower() == str(data.guest_email).lower())
+            and b.check_out == data.check_out and b.guest_email.lower() == str(data.guest_email).lower()
+            and (data.room_count is None or data.room_count == b.room_count))
 
 
 def create_booking(db: Session, data: BookingCreate, idempotency_key: str | None,
@@ -117,20 +122,35 @@ def create_booking(db: Session, data: BookingCreate, idempotency_key: str | None
     if room is None:
         db.rollback()
         raise NotFound("That room type is not available.", code="room_not_found")
-    if not availability.fits_party(room, data.adults, data.children):
+    needed = availability.rooms_needed(room, data.adults, data.children)
+    if needed is None:
         db.rollback()
-        raise AppError(f"The {room.name} sleeps up to {room.max_adults} adults and {room.max_children} "
-                       f"{'child' if room.max_children == 1 else 'children'}.", code="party_too_large")
+        raise AppError(f"This party is too large to book online in the {room.name}. Please contact reservations.",
+                       code="party_too_large")
+    room_count = data.room_count or needed
+    if room_count > s.max_rooms_per_booking:
+        db.rollback()
+        raise AppError(f"Online bookings are limited to {s.max_rooms_per_booking} rooms. Please contact reservations.",
+                       code="too_many_rooms", details=[{"field": "room_count", "message": "Too many rooms"}])
+    if not availability.fits_party(room, data.adults, data.children, room_count):
+        db.rollback()
+        kids = "child" if room.max_children == 1 else "children"
+        raise AppError(f"{room_count} x {room.name} can't sleep this party: each room sleeps up to {room.max_adults} "
+                       f"adults and {room.max_children} {kids}, with at least one adult per room.",
+                       code="party_too_large",
+                       details=[{"field": "room_count", "message": f"At least {needed} room(s) needed"}])
 
     booking_repo.expire_stale_holds(db, now, room.id)
-    if availability.available_rooms(db, room, data.check_in, data.check_out, now) < 1:
+    if availability.available_rooms(db, room, data.check_in, data.check_out, now) < room_count:
         db.rollback()
-        raise Conflict(f"Sorry, the {room.name} is no longer available for those dates.", code="sold_out")
+        msg = (f"Sorry, the {room.name} is no longer available for those dates." if room_count == 1
+               else f"Sorry, {room_count} x {room.name} are no longer free for those dates.")
+        raise Conflict(msg, code="sold_out")
 
-    q = availability.quote(room, nights, settings_repo.room_tax_percent(db))
+    q = availability.quote(room, nights, settings_repo.room_tax_percent(db), room_count)
     booking = Booking(
         reference=new_reference(), idempotency_key=idempotency_key, room_type_id=room.id,
-        check_in=data.check_in, check_out=data.check_out, nights=nights, adults=data.adults,
+        check_in=data.check_in, check_out=data.check_out, nights=nights, room_count=room_count, adults=data.adults,
         children=data.children, guest_name=data.guest_name, guest_email=str(data.guest_email).lower(),
         guest_phone=data.guest_phone, special_requests=data.special_requests,
         nightly_rate_paise=q.nightly_rate_paise, subtotal_paise=q.subtotal_paise, tax_percent=q.tax_percent,

@@ -100,6 +100,9 @@ export default function Book() {
                   <span className="card__media zoom"><img src={r.image_url} alt={r.image_alt || r.name} loading="lazy" /></span>
                   <div className="card__body">
                     <h3>{r.name}</h3>
+                    {r.bookable && r.room_count > 1 && (
+                      <p className="quote-rooms">{plural(r.room_count, 'room')} for your party of {guestsLabel(query.adults, query.children).toLowerCase()}</p>
+                    )}
                     <p>{r.summary}</p>
                     <ul className="quote-facts">
                       {[r.size_label, r.bed_label, r.view_label, r.occupancy_label].filter(Boolean).map((f, i) => <li key={i}>{f}</li>)}
@@ -108,7 +111,9 @@ export default function Book() {
                       <>
                         <p className="quote-price">
                           <span className="quote-price__rate">{rupees(r.nightly_rate_paise)}</span>
-                          <span className="quote-price__unit">per night · {rupees(r.total_paise)} for {plural(r.nights, 'night')}{r.tax_paise ? ' incl. taxes' : ''}</span>
+                          <span className="quote-price__unit">
+                            {r.room_count > 1 ? 'per room per night' : 'per night'} · {rupees(r.total_paise)} for {r.room_count > 1 ? `${plural(r.room_count, 'room')}, ` : ''}{plural(r.nights, 'night')}{r.tax_paise ? ' incl. taxes' : ''}
+                          </span>
                         </p>
                         <button type="button" className="btn" onClick={() => setSelected(r)} style={{ alignSelf: 'flex-start' }}>
                           {selected?.slug === r.slug ? 'Selected' : 'Select'}
@@ -116,7 +121,10 @@ export default function Book() {
                       </>
                     ) : (
                       <p className="quote-unavailable">
-                        {!r.fits_party ? `Sleeps up to ${r.occupancy_label && !r.occupancy_label.startsWith('[') ? r.occupancy_label : 'fewer guests'}` : 'Sold out for these dates'}
+                        {r.available_rooms > 0 && r.available_rooms < r.room_count
+                          ? `Only ${plural(r.available_rooms, 'room')} left; your party needs ${r.room_count}`
+                          : r.available_rooms > 0 ? 'This party is too large to book online. Please contact reservations.'
+                          : 'Sold out for these dates'}
                       </p>
                     )}
                   </div>
@@ -187,7 +195,7 @@ function GuestDetails({ quote, stay, onBooked }) {
     if (pending) return pay(pending);
     const body = {
       check_in: stay.check_in, check_out: stay.check_out, adults: stay.adults, children: stay.children,
-      room_type_slug: quote.slug, guest_name: v.guest_name.trim(), guest_email: v.guest_email.trim(),
+      room_type_slug: quote.slug, room_count: quote.room_count, guest_name: v.guest_name.trim(), guest_email: v.guest_email.trim(),
       guest_phone: v.guest_phone.trim(), special_requests: v.special_requests.trim() || null, accept_terms: true,
     };
     let created;
@@ -204,12 +212,12 @@ function GuestDetails({ quote, stay, onBooked }) {
     <div className="wrap split split--top">
       <div className="stack">
         <p className="kicker">Your stay</p>
-        <h2 id="details-title">{quote.name}</h2>
+        <h2 id="details-title">{quote.room_count > 1 ? `${quote.room_count} × ${quote.name}` : quote.name}</h2>
         <dl className="contact-list">
           <div><dt>Check-in</dt><dd>{longDate(stay.check_in)}</dd></div>
           <div><dt>Check-out</dt><dd>{longDate(stay.check_out)}</dd></div>
           <div><dt>Guests</dt><dd>{guestsLabel(stay.adults, stay.children)}</dd></div>
-          <div><dt>Rate</dt><dd>{rupees(quote.nightly_rate_paise)} × {plural(quote.nights, 'night')} = {rupees(quote.subtotal_paise)}</dd></div>
+          <div><dt>Rate</dt><dd>{rupees(quote.nightly_rate_paise)} × {plural(quote.nights, 'night')}{quote.room_count > 1 ? ` × ${plural(quote.room_count, 'room')}` : ''} = {rupees(quote.subtotal_paise)}</dd></div>
           {quote.tax_paise > 0 && <div><dt>Taxes ({Number(quote.tax_percent)}%)</dt><dd>{rupees(quote.tax_paise)}</dd></div>}
           <div className="summary-total"><dt>Total</dt><dd>{rupees(quote.total_paise)}</dd></div>
         </dl>

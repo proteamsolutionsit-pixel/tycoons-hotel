@@ -22,6 +22,7 @@ class Booking(TimestampMixin, Base):
         CheckConstraint("adults >= 1", name="adults_positive"),
         CheckConstraint("children >= 0", name="children_non_negative"),
         CheckConstraint("total_paise >= 0", name="total_non_negative"),
+        CheckConstraint("room_count >= 1", name="room_count_positive"),
         # Availability lookups: overlapping stays of one room type in a live status
         Index("ix_bookings_availability", "room_type_id", "status", "check_in", "check_out"),
         # Admin lists / reports
@@ -38,6 +39,8 @@ class Booking(TimestampMixin, Base):
     check_in: Mapped[date] = mapped_column(Date)
     check_out: Mapped[date] = mapped_column(Date)
     nights: Mapped[int] = mapped_column(Integer)
+    # Rooms of this type in the booking (a party larger than one room books several)
+    room_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     adults: Mapped[int] = mapped_column(Integer)
     children: Mapped[int] = mapped_column(Integer, default=0)
 

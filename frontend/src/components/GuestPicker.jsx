@@ -65,7 +65,7 @@ export default function GuestPicker({ value, onChange, roomMax }) {
           <Stepper label="Children" hint="Age 0–12" noun="child" value={children} min={LIMITS.children[0]} max={LIMITS.children[1]}
             onChange={(n) => onChange({ adults, children: n })} />
           {tooMany && (
-            <p className="guest-picker__note">Our rooms sleep up to {guestSummary(roomMax.adults, roomMax.children).toLowerCase()} each. For a larger party, book more than one room or contact reservations.</p>
+            <p className="guest-picker__note">Our rooms sleep up to {guestSummary(roomMax.adults, roomMax.children).toLowerCase()} each, so we’ll show you prices for enough rooms for everyone.</p>
           )}
           <button type="button" className="btn guest-picker__done" onClick={() => { setOpen(false); toggle.current?.focus(); }}>Done</button>
         </div>

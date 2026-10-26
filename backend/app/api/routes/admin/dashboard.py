@@ -52,8 +52,9 @@ def dashboard(_: AdminUser = Depends(require(Permission.DASHBOARD_VIEW)), db: Se
         Payment.status == PaymentStatus.REFUNDED, Payment.refunded_at >= now - timedelta(days=30))).scalar_one()
     rooms_total = db.execute(select(func.coalesce(func.sum(RoomType.total_rooms), 0))
                              .where(RoomType.is_active.is_(True))).scalar_one()
-    sold_tonight = count(select(Booking.id).where(Booking.status.in_(_SOLD), Booking.check_in <= today,
-                                                  Booking.check_out > today))
+    sold_tonight = db.execute(select(func.coalesce(func.sum(Booking.room_count), 0)).where(
+        Booking.status.in_(_SOLD), Booking.check_in <= today, Booking.check_out > today)).scalar_one()
+    sold_tonight = int(sold_tonight)
     new = {}
     for key, model in (("table_reservations", TableReservation), ("spa_appointments", SpaAppointment),
                        ("enquiries", Enquiry), ("applications", JobApplication)):
@@ -102,7 +103,8 @@ def occupancy(start: date | None = None, days: int = Query(14, ge=1, le=62),
     end = start + timedelta(days=days)
     now = utcnow()
     rooms = db.execute(select(RoomType).order_by(RoomType.sort_order, RoomType.id)).scalars().all()
-    stays = db.execute(select(Booking.room_type_id, Booking.check_in, Booking.check_out, Booking.status).where(
+    stays = db.execute(select(Booking.room_type_id, Booking.check_in, Booking.check_out, Booking.status,
+                              Booking.room_count).where(
         Booking.check_in < end, Booking.check_out > start,
         or_(Booking.status.in_(_SOLD),
             and_(Booking.status == BookingStatus.PENDING_PAYMENT, Booking.hold_expires_at > now)))).all()
@@ -110,12 +112,12 @@ def occupancy(start: date | None = None, days: int = Query(14, ge=1, le=62),
     out = []
     for r in rooms:
         booked, held = [0] * days, [0] * days
-        for rid, ci, co, st in stays:
+        for rid, ci, co, st, cnt in stays:
             if rid != r.id:
                 continue
             for i, n in enumerate(nights):
                 if ci <= n < co:
-                    (held if st == BookingStatus.PENDING_PAYMENT else booked)[i] += 1
+                    (held if st == BookingStatus.PENDING_PAYMENT else booked)[i] += cnt
         out.append(OccupancyRoom(slug=r.slug, name=r.name, total_rooms=r.total_rooms, booked=booked, held=held))
     return Occupancy(start=start, days=nights, rooms=out)
 
