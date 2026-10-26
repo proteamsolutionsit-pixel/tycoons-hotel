@@ -151,3 +151,34 @@
 
 /* 404 */
 .not-found { min-height: 70vh; display: grid; align-content: center; }
+
+/* Guests picker (booking bar): looks like the other fields, opens a stepper panel */
+.guest-picker { position: relative; }
+.guest-picker__toggle {
+  width: 100%; min-height: 48px; padding: 0 var(--s-7) 0 var(--s-3);
+  border: 1px solid var(--c-field); border-radius: 0; background-color: var(--c-bg); color: var(--c-text);
+  font-size: 0.9375rem; font-weight: 400; letter-spacing: 0; text-transform: none; text-align: left; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 20px) 50%, calc(100% - 15px) 50%; background-size: 5px 5px; background-repeat: no-repeat;
+}
+.guest-picker__toggle[aria-expanded="true"] { border-color: var(--c-accent-ink); }
+.guest-picker__panel {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: max(100%, 300px);
+  display: grid; gap: var(--s-4); padding: var(--s-5);
+  background: var(--c-surface); border: 1px solid var(--c-line); box-shadow: var(--shadow-float);
+  text-transform: none; letter-spacing: 0; color: var(--c-text); font-size: 0.9375rem;
+}
+.guest-picker__row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
+.guest-picker__label { display: grid; gap: 2px; }
+.guest-picker__label small { color: var(--c-text-muted); font-size: var(--t-xs); }
+.guest-picker__stepper { display: inline-flex; align-items: center; gap: var(--s-3); }
+.guest-picker__btn {
+  display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--c-field); background: var(--c-surface); color: var(--c-brand); cursor: pointer;
+}
+.guest-picker__btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+.guest-picker__btn:hover:not(:disabled) { border-color: var(--c-brand); background: var(--c-bg-alt); }
+.guest-picker__btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.guest-picker__count { min-width: 1.5ch; text-align: center; font-variant-numeric: tabular-nums; }
+.guest-picker__note { margin: 0; font-size: var(--t-xs); color: var(--c-accent-ink); line-height: 1.5; }
+.guest-picker__done { justify-self: end; min-height: 40px; }

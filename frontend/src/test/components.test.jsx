@@ -35,7 +35,7 @@ describe('api client', () => {
 
 describe('BookingBar', () => {
   beforeEach(() => {
-    vi.spyOn(globalThis, 'fetch').mockReturnValue(jsonResponse(200, [{ slug: 'twin-room', name: 'Twin Room' }]));
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(jsonResponse(200, [{ slug: 'twin-room', name: 'Twin Room', max_adults: 2, max_children: 1 }]));
   });
 
   it('refuses a check-out before check-in', async () => {
@@ -59,10 +59,33 @@ describe('BookingBar', () => {
     );
     const [checkin] = container.querySelectorAll('input[type=date]');
     await user.type(checkin, ci); // check-out defaults to the next day
-    await user.selectOptions(container.querySelector('select[name=guests]'), '2-1');
+    await user.click(screen.getByRole('button', { name: /Guests/ }));
+    await user.click(screen.getByRole('button', { name: 'Add adult' }));
+    await user.click(screen.getByRole('button', { name: 'Add child' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.getByRole('button', { name: /Guests/ })).toHaveTextContent('2 Adults, 1 Child');
     await user.click(screen.getByRole('button', { name: 'Check Availability' }));
     await waitFor(() => expect(screen.getByTestId('where').textContent)
       .toBe(`/book?check_in=${ci}&check_out=${addDays(ci, 1)}&adults=2&children=1`));
+  });
+
+  it('guest steppers stop at the limits and warn above room capacity', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><BookingBar /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: /Guests/ }));
+    expect(screen.getByRole('button', { name: 'Remove adult' })).toBeDisabled();       // at least 1 adult
+    expect(screen.getByRole('button', { name: 'Remove child' })).toBeDisabled();
+    for (let i = 0; i < 8; i += 1) await user.click(screen.getByRole('button', { name: 'Add adult' }));
+    expect(screen.getByRole('button', { name: 'Add adult' })).toBeDisabled();          // server max: 6
+    expect(screen.getByRole('group', { name: 'Adults' })).toHaveTextContent('6');
+    expect(await screen.findByText(/Our rooms sleep up to 2 adults, 1 child each/)).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('reads guests from the URL, clamped to the limits', async () => {
+    render(<MemoryRouter initialEntries={['/?adults=9&children=2']}><BookingBar /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: /Guests/ })).toHaveTextContent('6 Adults, 2 Children');
   });
 });
 

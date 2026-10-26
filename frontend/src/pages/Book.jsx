@@ -54,7 +54,12 @@ export default function Book() {
     if (selected) requestAnimationFrame(() => detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }, [selected]);
 
-  const rooms = result.data?.rooms || [];
+  // The room chosen in the bar is listed first; the rest keep the server's order
+  const rooms = useMemo(() => {
+    const list = result.data?.rooms || [];
+    if (!query.room) return list;
+    return [...list.filter((r) => r.slug === query.room), ...list.filter((r) => r.slug !== query.room)];
+  }, [result.data, query.room]);
   const anyBookable = rooms.some((r) => r.bookable);
 
   return (

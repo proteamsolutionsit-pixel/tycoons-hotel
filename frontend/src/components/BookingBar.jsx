@@ -5,13 +5,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { siteApi } from '../services/api';
 import { addDays, hotelToday } from '../utils/format';
+import GuestPicker, { LIMITS } from './GuestPicker';
 
-// The three options in the original design, as (adults, children)
-export const GUEST_OPTIONS = [
-  { value: '1-0', label: '1 Adult' },
-  { value: '2-0', label: '2 Adults' },
-  { value: '2-1', label: '2 Adults, 1 Child' },
-];
+const clamp = (n, [lo, hi], fallback) => (Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.trunc(n))) : fallback);
+
+/** "2-1" or URL params -> { adults, children } within the server's limits */
+export function parseGuests(text, adults, children) {
+  const [a, c] = (text || '').split('-').map(Number);
+  return {
+    adults: clamp(text ? a : Number(adults ?? 1), LIMITS.adults, 1),
+    children: clamp(text ? c : Number(children ?? 0), LIMITS.children, 0),
+  };
+}
 
 let roomsCache = null;
 
@@ -24,7 +29,7 @@ export default function BookingBar({ className = 'booking', motion = true, initi
   const [values, setValues] = useState(() => ({
     checkin: initial.check_in || params.get('check_in') || '',
     checkout: initial.check_out || params.get('check_out') || '',
-    guests: initial.guests || `${params.get('adults') || 1}-${params.get('children') || 0}`,
+    guests: parseGuests(initial.guests, params.get('adults'), params.get('children')),
     room: initial.room ?? params.get('room') ?? '',
   }));
   const [errors, setErrors] = useState({});
@@ -39,6 +44,12 @@ export default function BookingBar({ className = 'booking', motion = true, initi
     const r = params.get('room');
     if (r !== null) setValues((v) => ({ ...v, room: r }));
   }, [params]);
+
+  // Largest room, so the picker can warn before the search instead of after
+  const roomMax = rooms.some((r) => r.max_adults) ? {
+    adults: Math.max(...rooms.map((r) => r.max_adults || 0)),
+    children: Math.max(...rooms.map((r) => r.max_children || 0)),
+  } : null;
 
   const set = (k) => (e) => {
     const v = e.target.value;
@@ -62,8 +73,8 @@ export default function BookingBar({ className = 'booking', motion = true, initi
       e.currentTarget.querySelector(`[name="${Object.keys(er)[0]}"]`)?.focus();
       return;
     }
-    const [adults, children] = values.guests.split('-');
-    const q = new URLSearchParams({ check_in: values.checkin, check_out: values.checkout, adults, children });
+    const { adults, children } = values.guests;
+    const q = new URLSearchParams({ check_in: values.checkin, check_out: values.checkout, adults: String(adults), children: String(children) });
     if (values.room) q.set('room', values.room);
     if (onSearch) onSearch(Object.fromEntries(q));
     else navigate(`/book?${q.toString()}`);
@@ -85,11 +96,7 @@ export default function BookingBar({ className = 'booking', motion = true, initi
               value={values.checkout} onChange={set('checkout')} {...aria('checkout')} />
             {err('checkout')}
           </label>
-          <label className="field field--wide">Guests
-            <select name="guests" value={values.guests} onChange={set('guests')}>
-              {GUEST_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </label>
+          <GuestPicker value={values.guests} roomMax={roomMax} onChange={(g) => setValues((s) => ({ ...s, guests: g }))} />
           <label className="field field--wide">Room
             <select name="room" value={values.room} onChange={set('room')}>
               <option value="">Any room</option>
