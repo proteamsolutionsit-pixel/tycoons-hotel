@@ -196,3 +196,6 @@
 .utility__address { flex: 1 1 auto; min-width: 0; margin-right: var(--s-6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .utility__links { flex: 0 0 auto; }
 .utility__links a { white-space: nowrap; }
+
+/* Homepage room cards: what the rate includes, under the room name */
+.room__head .room__meta { margin: 4px 0 0; }

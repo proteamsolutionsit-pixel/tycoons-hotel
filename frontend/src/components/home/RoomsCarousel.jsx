@@ -142,7 +142,10 @@ export default function RoomsCarousel({ rooms }) {
             <Link className="room__link" to={`/?room=${encodeURIComponent(r.slug)}#book`}>
               <img src={r.image_url} alt={r.image_alt || r.name} loading="lazy" draggable="false" />
               <div className="room__info">
-                <div className="room__head"><h3>{r.name}</h3></div>
+                <div className="room__head">
+                  <h3>{r.name}</h3>
+                  {r.inclusions && <p className="room__meta">{r.inclusions}</p>}
+                </div>
                 <div className="room__more">
                   <p>{r.summary}</p>
                   <span className="room__cta">Check rates</span>

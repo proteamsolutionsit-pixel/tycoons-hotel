@@ -69,6 +69,28 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0022 — Show each room's rate and "Included with the rate" wherever it is filled in
+- **Date:** 2026-11-06 · **Module:** Public site — Rooms page, homepage room carousel · **Change type:** Enhancement
+- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** see `git log` · **Release:** REL-0012
+- **Related:** CHG-0019
+
+**Reason:** The hotel filled *Included with the rate* ("Complimentary breakfast") for every room and set real rates
+(Premium ₹5,500, Deluxe ₹4,500, Suite ₹7,000) but saw the full tariff only for Twin Room.
+**Previous behaviour:** Rooms page: rooms without a single-occupancy rate showed only the inclusions, no price
+(prices were then placeholders, CHG-0019). Homepage carousel: no inclusions for any room. Booking page already
+showed inclusions for every room (verified on staging before this change).
+**New behaviour:** Rooms page shows "₹5,500 per night · Complimentary breakfast" for any room with inclusions (Twin
+keeps its single/double tariff). Homepage room cards show the inclusions under the room name (the design's unused
+`.room__meta` style). A room with neither inclusions nor a single rate still shows no price line.
+**Files modified:** `frontend/src/pages/Rooms.jsx`, `frontend/src/components/home/RoomsCarousel.jsx`,
+`frontend/src/styles/app.css`, `CHANGELOG.md`
+**Security / database / API / configuration impact:** None (data already public via `GET /rooms`).
+**Testing performed:** Frontend **31 passed**. Browser (Edge, local, with staging's `GET /rooms` data): Rooms page
+lines for all four rooms as above; homepage cards show "Complimentary breakfast" for all four.
+**Deployment notes:** Frontend only. **Rollback:** redeploy the previous release.
+
+---
+
 ### CHG-0021 — Header strip: phone number and email stay on one line
 - **Date:** 2026-11-06 · **Module:** Public site — header utility strip · **Change type:** Bug Fix
 - **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** `cbe0ab2` · **Bug:** BUG-0012 · **Release:** REL-0011
