@@ -71,8 +71,8 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ### CHG-0019 — Occupancy-based room rates (single / double) and rate inclusions; Twin Room tariff
 - **Date:** 2026-11-06 · **Version:** API 1.1.0 · **Module:** Rooms & rates, availability/pricing, booking, public site, admin
-- **Change type:** Feature, Database, API · **Environment:** Development · **Status:** Tested (not yet deployed to staging)
-- **Related commit:** see `git log` (commit following `ee04df0`) · **Feature:** FEAT-0012
+- **Change type:** Feature, Database, API · **Environment:** Development, Staging · **Status:** Deployed (staging)
+- **Related commit:** `034ce29` · **Feature:** FEAT-0012 · **Release:** REL-0009
 
 **Reason:** The hotel set the Twin Room tariff by occupancy — single occupancy ₹3,500 per night, double occupancy
 ₹4,500 per night, complimentary breakfast with both — and the price shown and charged must follow the occupancy.
@@ -125,9 +125,11 @@ The occupancy split is derived from the validated party, not from client input.
   "(₹4,500 double + ₹3,500 single) × 1 night"; no page errors.
 - Local database migrated (backup `backups/tycoons-20261106T053008Z.sql`).
 
-**Deployment notes:** Back up → `migrate.py` (revision `4e8b1d6f2c30`) → release → restart. Then enter the Twin
-Room tariff in Admin > Rooms & rates (or via the admin API): standard ₹4,500, single ₹3,500, inclusions
-"Complimentary breakfast". Until entered, staging prices are unchanged.
+**Deployment notes:** Back up → `migrate.py` (revision `4e8b1d6f2c30`) → release → restart. Done on staging
+2026-11-06 (REL-0009). **Data change on staging:** Twin Room tariff set through the admin API (audited as
+`room_type.update`): standard ₹6,500 → ₹4,500, single ₹3,500 (new), inclusions "Complimentary breakfast".
+Staging check after deploy: 1 adult ₹3,500, 2 adults ₹4,500, 3 adults ₹8,000 for 2 rooms (1 single);
+`GET /rooms` returns both rates; live bundle matches the build.
 **Rollback plan:** Clear the single rate in the admin to return to one rate; or `alembic downgrade 9d4f2a7c1e85`
 (drops the columns; stored booking totals remain) and redeploy the previous release.
 
@@ -540,7 +542,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Feature | Requirement | Behaviour | Change | Config needed | Tests | Release status |
 |---|---|---|---|---|---|---|---|
-| FEAT-0012 | Occupancy-based rates + inclusions | Twin Room: single ₹3,500, double ₹4,500, breakfast included | Single rate for one-adult rooms; tariff and breakdown shown | CHG-0019 | Enter rates per room type in the admin | 389 backend, 30 frontend | Tested; not deployed |
+| FEAT-0012 | Occupancy-based rates + inclusions | Twin Room: single ₹3,500, double ₹4,500, breakfast included | Single rate for one-adult rooms; tariff and breakdown shown | CHG-0019 | Enter rates per room type in the admin | 389 backend, 30 frontend | Deployed (staging) |
 | FEAT-0011 | Multi-room bookings | Offer enough rooms when a party exceeds one room | Fewest rooms per type; one payment | CHG-0017 | `MAX_ROOMS_PER_BOOKING` (optional) | 384 backend, 28 frontend | Deployed (staging) |
 | FEAT-0010 | Guest steppers; chosen room first | Any party size; respect selection | − / + adults & children; chosen room first | CHG-0016 | — | 28 frontend | Deployed (staging) |
 | FEAT-0009 | Roles & access | Per-user access | Custom roles, permission checklist | CHG-0014 | — | 373 backend, 26 frontend | Deployed (staging) |
@@ -562,7 +564,7 @@ using the schema-owner account; **back up first**. Order on deploy: migration, t
 
 | ID | Revision | Date | Change | Data transformation | Rollback | Staging |
 |---|---|---|---|---|---|---|
-| DB-0006 | `4e8b1d6f2c30` | 2026-11-06 | `room_types.single_rate_paise` (NULL), `room_types.inclusions` ('') + check single rate ≥ 0; `bookings.single_room_count` (0), `bookings.single_rate_paise` (NULL), `bookings.inclusions` (NULL) | None | `alembic downgrade 9d4f2a7c1e85` | Not yet applied (applied locally 2026-11-06) |
+| DB-0006 | `4e8b1d6f2c30` | 2026-11-06 | `room_types.single_rate_paise` (NULL), `room_types.inclusions` ('') + check single rate ≥ 0; `bookings.single_room_count` (0), `bookings.single_rate_paise` (NULL), `bookings.inclusions` (NULL) | None | `alembic downgrade 9d4f2a7c1e85` | Applied 2026-11-06 after backup `tycoons-20261106T054549Z.sql.gz` |
 | DB-0005 | `9d4f2a7c1e85` | 2026-10-26 | `bookings.room_count INT NOT NULL DEFAULT 1` + check `room_count >= 1` | None (existing = 1) | `alembic downgrade 7b1e4c2d9a60` (multi-room bookings read as 1 room) | Applied 2026-10-26 after backup `tycoons-20261026T070541Z.sql.gz` |
 | DB-0004 | `7b1e4c2d9a60` | 2026-10-26 | `roles` table; `admin_users.role_id` (FK RESTRICT, indexed) | Inserts Administrator & Front desk; sets every user's `role_id` from `role` | `alembic downgrade 3c7d9a51f0b2` (custom roles lost) | Applied 2026-10-26 after backup `tycoons-20261026T054816Z.sql.gz` |
 | DB-0003 | `3c7d9a51f0b2` | 2026-10-24 | `payment_gateway_settings` (single row; encrypted secret columns) | None | `alembic downgrade e52a1c1bd47a` (saved keys lost) | Applied 2026-10-26 after backup `tycoons-20261026T035748Z.sql.gz` |
@@ -644,6 +646,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0009 | 2026-11-06 | `tycoons-20261106T054735Z` | CHG-0019 (+ Twin Room tariff entered) | `4e8b1d6f2c30` | Twin: 1 adult ₹3,500, 2 adults ₹4,500, 3 adults ₹8,000/2 rooms; bundle matched |
 | REL-0008 | 2026-10-26 | `tycoons-20261026T070733Z` | CHG-0017 | `9d4f2a7c1e85` | Availability for 2/4/3+2/1+3 guests as expected; admin pages 200 |
 | REL-0007 | 2026-10-26 | `tycoons-20261026T061633Z` | CHG-0016 | — | Live bundle = local build; ready 200 |
 | REL-0006 | 2026-10-26 | `tycoons-20261026T055445Z` | CHG-0015 (+ admin email changed via API) | — | New email signs in; old refused |
