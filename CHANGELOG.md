@@ -71,7 +71,7 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ### CHG-0022 — Show each room's rate and "Included with the rate" wherever it is filled in
 - **Date:** 2026-11-06 · **Module:** Public site — Rooms page, homepage room carousel · **Change type:** Enhancement
-- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** see `git log` · **Release:** REL-0012
+- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** `3ac9895` · **Release:** REL-0012
 - **Related:** CHG-0019
 
 **Reason:** The hotel filled *Included with the rate* ("Complimentary breakfast") for every room and set real rates
@@ -729,6 +729,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0012 | 2026-11-06 | `tycoons-20261106T072805Z` | CHG-0022 | — | Bundle matched; ready 200 |
 | REL-0011 | 2026-11-06 | `tycoons-20261106T063307Z` | CHG-0021 | — | Live CSS contains the fix; bundle matched; ready 200 |
 | REL-0010 | 2026-11-06 | `tycoons-20261106T062024Z` | CHG-0020 (+ `app.cli seed`: 1 setting added) | — | Setting present; invalid number 422; bundle matched |
 | REL-0009 | 2026-11-06 | `tycoons-20261106T054735Z` | CHG-0019 (+ Twin Room tariff entered) | `4e8b1d6f2c30` | Twin: 1 adult ₹3,500, 2 adults ₹4,500, 3 adults ₹8,000/2 rooms; bundle matched |
