@@ -20,6 +20,8 @@ class RoomTypePublic(ORMModel):
     max_adults: int
     max_children: int
     base_rate_paise: int
+    single_rate_paise: int | None = None
+    inclusions: str = ""
     is_signature: bool
 
 

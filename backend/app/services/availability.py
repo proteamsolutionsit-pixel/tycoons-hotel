@@ -18,7 +18,10 @@ from app.repositories import bookings as booking_repo
 @dataclass(frozen=True)
 class Quote:
     nights: int
-    nightly_rate_paise: int
+    nightly_rate_paise: int        # standard / double-occupancy rate per room
+    single_rate_paise: int | None  # single-occupancy rate, if the room type has one
+    single_rooms: int              # rooms charged at the single rate
+    nightly_total_paise: int       # all rooms, one night
     subtotal_paise: int
     tax_percent: Decimal
     tax_paise: int
@@ -75,9 +78,23 @@ def available_rooms(db: Session, room: RoomType, check_in: date, check_out: date
     return max(0, room.total_rooms - peak_occupancy(stays, check_in, check_out))
 
 
-def quote(room: RoomType, nights: int, tax_percent: Decimal, rooms: int = 1) -> Quote:
-    """Nightly rate is per room; the subtotal covers every room for every night."""
-    subtotal = room.base_rate_paise * nights * rooms
+def occupancy_split(adults: int, rooms: int) -> list[int]:
+    """Adults per room, spread as evenly as possible (3 adults in 2 rooms -> [2, 1])."""
+    base, extra = divmod(adults, rooms)
+    return [base + 1] * extra + [base] * (rooms - extra)
+
+
+def quote(room: RoomType, nights: int, tax_percent: Decimal, rooms: int = 1, adults: int | None = None) -> Quote:
+    """Rates are per room per night: a room holding one adult is charged the
+    single-occupancy rate when the room type has one, otherwise the standard rate.
+    Children do not change the occupancy rate. Without `adults`, every room is standard."""
+    single = room.single_rate_paise
+    singles = 0
+    if single is not None and adults is not None:
+        singles = sum(1 for a in occupancy_split(adults, rooms) if a == 1)
+    nightly_total = room.base_rate_paise * (rooms - singles) + (single or 0) * singles
+    subtotal = nightly_total * nights
     tax = int((Decimal(subtotal) * tax_percent / Decimal(100)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-    return Quote(nights=nights, nightly_rate_paise=room.base_rate_paise, subtotal_paise=subtotal,
+    return Quote(nights=nights, nightly_rate_paise=room.base_rate_paise, single_rate_paise=single,
+                 single_rooms=singles, nightly_total_paise=nightly_total, subtotal_paise=subtotal,
                  tax_percent=tax_percent, tax_paise=tax, total_paise=subtotal + tax)

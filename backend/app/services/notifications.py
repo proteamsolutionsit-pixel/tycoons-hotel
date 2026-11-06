@@ -25,6 +25,7 @@ def booking_confirmed(background: BackgroundTasks, b: Booking) -> None:
         f"Check-out: {b.check_out:%A, %d %B %Y} ({b.nights} night{'s' if b.nights != 1 else ''})",
         f"Guests: {b.adults} adult{'s' if b.adults != 1 else ''}"
         + (f", {b.children} child{'ren' if b.children != 1 else ''}" if b.children else ""),
+        *([f"Includes: {b.inclusions}"] if b.inclusions else []),
         f"Amount paid: {rupees(b.total_paise)}",
         "",
         "We look forward to welcoming you.",

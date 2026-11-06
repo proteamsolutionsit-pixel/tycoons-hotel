@@ -53,6 +53,7 @@ def to_public(b: Booking) -> BookingPublic:
         nights=b.nights,
         adults=b.adults, children=b.children, guest_name=b.guest_name, guest_email=b.guest_email,
         guest_phone=b.guest_phone, special_requests=b.special_requests, nightly_rate_paise=b.nightly_rate_paise,
+        single_room_count=b.single_room_count, single_rate_paise=b.single_rate_paise, inclusions=b.inclusions,
         subtotal_paise=b.subtotal_paise, tax_percent=b.tax_percent, tax_paise=b.tax_paise,
         total_paise=b.total_paise, currency=b.currency, hold_expires_at=b.hold_expires_at,
         confirmed_at=b.confirmed_at, payment_status=p.status if p else None, created_at=b.created_at,
@@ -76,14 +77,16 @@ def search(db: Session, check_in: date, check_out: date, adults: int, children: 
         fits = availability.fits_party(room, adults, children)
         needed = availability.rooms_needed(room, adults, children)
         count = needed or 1
-        q = availability.quote(room, nights, tax, count)
+        q = availability.quote(room, nights, tax, count, adults)
         quotes.append(RoomQuote(
             slug=room.slug, name=room.name, summary=room.summary, image_url=room.image_url,
             image_alt=room.image_alt, size_label=room.size_label, bed_label=room.bed_label,
             view_label=room.view_label, occupancy_label=room.occupancy_label, is_signature=room.is_signature,
             fits_party=fits, room_count=count, max_rooms=min(free, get_settings().max_rooms_per_booking),
             available_rooms=free, bookable=needed is not None and free >= needed, nights=nights,
-            nightly_rate_paise=q.nightly_rate_paise, subtotal_paise=q.subtotal_paise, tax_percent=q.tax_percent,
+            nightly_rate_paise=q.nightly_rate_paise, single_rate_paise=q.single_rate_paise, single_rooms=q.single_rooms,
+            nightly_total_paise=q.nightly_total_paise, inclusions=room.inclusions or "",
+            subtotal_paise=q.subtotal_paise, tax_percent=q.tax_percent,
             tax_paise=q.tax_paise, total_paise=q.total_paise, currency=currency,
         ))
     return AvailabilityResult(check_in=check_in, check_out=check_out, nights=nights, adults=adults,
@@ -147,13 +150,15 @@ def create_booking(db: Session, data: BookingCreate, idempotency_key: str | None
                else f"Sorry, {room_count} x {room.name} are no longer free for those dates.")
         raise Conflict(msg, code="sold_out")
 
-    q = availability.quote(room, nights, settings_repo.room_tax_percent(db), room_count)
+    q = availability.quote(room, nights, settings_repo.room_tax_percent(db), room_count, data.adults)
     booking = Booking(
         reference=new_reference(), idempotency_key=idempotency_key, room_type_id=room.id,
         check_in=data.check_in, check_out=data.check_out, nights=nights, room_count=room_count, adults=data.adults,
         children=data.children, guest_name=data.guest_name, guest_email=str(data.guest_email).lower(),
         guest_phone=data.guest_phone, special_requests=data.special_requests,
-        nightly_rate_paise=q.nightly_rate_paise, subtotal_paise=q.subtotal_paise, tax_percent=q.tax_percent,
+        nightly_rate_paise=q.nightly_rate_paise, single_room_count=q.single_rooms, single_rate_paise=q.single_rate_paise,
+        inclusions=room.inclusions or None,
+        subtotal_paise=q.subtotal_paise, tax_percent=q.tax_percent,
         tax_paise=q.tax_paise, total_paise=q.total_paise, currency=s.currency,
         status=BookingStatus.PENDING_PAYMENT, hold_expires_at=now + timedelta(minutes=s.booking_hold_minutes),
         # What the guest agreed to, as shown to them at booking time

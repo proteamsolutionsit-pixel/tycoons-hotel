@@ -89,3 +89,30 @@ export function uuid() {
   const b = crypto.getRandomValues(new Uint8Array(16));
   return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 }
+
+/** Public tariff line: "Single occupancy ₹3,500 · Double occupancy ₹4,500 · Complimentary breakfast".
+    Empty when the room has one rate and no inclusions. */
+export function tariffLine(baseRate, singleRate, inclusions) {
+  const parts = [];
+  if (singleRate !== null && singleRate !== undefined) {
+    parts.push(`Single occupancy ${rupees(singleRate)}`, `Double occupancy ${rupees(baseRate)}`);
+  }
+  if (inclusions) parts.push(inclusions);
+  return parts.join(' · ');
+}
+
+/** "₹3,500 (single occupancy) × 1 night", "(₹4,500 double + ₹3,500 single) × 2 nights",
+    "₹6,500 × 2 rooms × 2 nights" - one night's rooms times the nights. */
+export function rateBreakdown({ rate, singleRate, singles = 0, rooms = 1, nights }) {
+  const hasSingle = singleRate !== null && singleRate !== undefined && singles > 0;
+  const doubles = rooms - (hasSingle ? singles : 0);
+  const nightsText = ` × ${plural(nights, 'night')}`;
+  if (!hasSingle && (singleRate === null || singleRate === undefined)) {
+    return `${rupees(rate)}${rooms > 1 ? ` × ${plural(rooms, 'room')}` : ''}${nightsText}`;
+  }
+  const part = (amount, label, n) => `${rupees(amount)} ${label}${n > 1 ? ` × ${n}` : ''}`;
+  const lines = [];
+  if (doubles > 0) lines.push(part(rate, rooms === 1 ? '(double occupancy)' : 'double', doubles));
+  if (hasSingle) lines.push(part(singleRate, rooms === 1 ? '(single occupancy)' : 'single', singles));
+  return (lines.length > 1 ? `(${lines.join(' + ')})` : lines[0]) + nightsText;
+}

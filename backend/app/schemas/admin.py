@@ -171,6 +171,9 @@ class BookingRow(ORMModel):
 class BookingDetail(BookingRow):
     special_requests: str | None
     nightly_rate_paise: int
+    single_room_count: int = 0
+    single_rate_paise: int | None = None
+    inclusions: str | None = None
     subtotal_paise: int
     tax_percent: Decimal
     tax_paise: int
@@ -240,7 +243,10 @@ class RoomTypeBase(StrictInput):
     occupancy_label: str = Field(default="", max_length=120)
     max_adults: int = Field(ge=1, le=10)
     max_children: int = Field(ge=0, le=10)
-    base_rate_paise: int = Field(ge=100, le=100_000_000, description="Per night, before tax, in paise")
+    base_rate_paise: int = Field(ge=100, le=100_000_000, description="Standard / double occupancy, per night, before tax, in paise")
+    single_rate_paise: int | None = Field(default=None, ge=100, le=100_000_000,
+                                          description="Single occupancy (one adult); empty = standard rate")
+    inclusions: str = Field(default="", max_length=255)
     total_rooms: int = Field(ge=0, le=1000)
     is_signature: bool = False
     sort_order: int = 0
@@ -264,6 +270,8 @@ class RoomTypeUpdate(StrictInput):
     max_adults: int | None = Field(default=None, ge=1, le=10)
     max_children: int | None = Field(default=None, ge=0, le=10)
     base_rate_paise: int | None = Field(default=None, ge=100, le=100_000_000)
+    single_rate_paise: int | None = Field(default=None, ge=100, le=100_000_000)
+    inclusions: str | None = Field(default=None, max_length=255)
     total_rooms: int | None = Field(default=None, ge=0, le=1000)
     is_signature: bool | None = None
     sort_order: int | None = None

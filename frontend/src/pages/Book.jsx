@@ -12,7 +12,7 @@ import { useSite } from '../context/SiteContext';
 import { usePageMotion } from '../motion/usePageMotion';
 import { ApiError, siteApi } from '../services/api';
 import { openCheckout } from '../services/razorpay';
-import { guestsLabel, longDate, plural, rupees, timeOnly, uuid } from '../utils/format';
+import { guestsLabel, longDate, plural, rateBreakdown, rupees, tariffLine, timeOnly, uuid } from '../utils/format';
 import { rememberBookingEmail } from './bookingSession';
 
 export default function Book() {
@@ -107,12 +107,17 @@ export default function Book() {
                     <ul className="quote-facts">
                       {[r.size_label, r.bed_label, r.view_label, r.occupancy_label].filter(Boolean).map((f, i) => <li key={i}>{f}</li>)}
                     </ul>
+                    {tariffLine(r.nightly_rate_paise, r.single_rate_paise, r.inclusions) && (
+                      <p className="quote-tariff">{tariffLine(r.nightly_rate_paise, r.single_rate_paise, r.inclusions)}</p>
+                    )}
                     {r.bookable ? (
                       <>
                         <p className="quote-price">
-                          <span className="quote-price__rate">{rupees(r.nightly_rate_paise)}</span>
+                          <span className="quote-price__rate">{rupees(r.nightly_total_paise || r.nightly_rate_paise * r.room_count)}</span>
                           <span className="quote-price__unit">
-                            {r.room_count > 1 ? 'per room per night' : 'per night'} · {rupees(r.total_paise)} for {r.room_count > 1 ? `${plural(r.room_count, 'room')}, ` : ''}{plural(r.nights, 'night')}{r.tax_paise ? ' incl. taxes' : ''}
+                            {r.room_count > 1 ? `per night for ${plural(r.room_count, 'room')}`
+                              : r.single_rate_paise != null ? `per night · ${r.single_rooms ? 'single' : 'double'} occupancy` : 'per night'}
+                            {' · '}{rupees(r.total_paise)} for {plural(r.nights, 'night')}{r.tax_paise ? ' incl. taxes' : ''}
                           </span>
                         </p>
                         <button type="button" className="btn" onClick={() => setSelected(r)} style={{ alignSelf: 'flex-start' }}>
@@ -217,7 +222,8 @@ function GuestDetails({ quote, stay, onBooked }) {
           <div><dt>Check-in</dt><dd>{longDate(stay.check_in)}</dd></div>
           <div><dt>Check-out</dt><dd>{longDate(stay.check_out)}</dd></div>
           <div><dt>Guests</dt><dd>{guestsLabel(stay.adults, stay.children)}</dd></div>
-          <div><dt>Rate</dt><dd>{rupees(quote.nightly_rate_paise)} × {plural(quote.nights, 'night')}{quote.room_count > 1 ? ` × ${plural(quote.room_count, 'room')}` : ''} = {rupees(quote.subtotal_paise)}</dd></div>
+          <div><dt>Rate</dt><dd>{rateBreakdown({ rate: quote.nightly_rate_paise, singleRate: quote.single_rate_paise, singles: quote.single_rooms, rooms: quote.room_count, nights: quote.nights })} = {rupees(quote.subtotal_paise)}</dd></div>
+          {quote.inclusions && <div><dt>Includes</dt><dd>{quote.inclusions}</dd></div>}
           {quote.tax_paise > 0 && <div><dt>Taxes ({Number(quote.tax_percent)}%)</dt><dd>{rupees(quote.tax_paise)}</dd></div>}
           <div className="summary-total"><dt>Total</dt><dd>{rupees(quote.total_paise)}</dd></div>
         </dl>

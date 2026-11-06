@@ -9,7 +9,7 @@ import { SplitText } from '../components/SplitText';
 import { usePageMotion } from '../motion/usePageMotion';
 import { ApiError, siteApi } from '../services/api';
 import { openCheckout } from '../services/razorpay';
-import { dateTime, guestsLabel, longDate, plural, rupees, timeOnly } from '../utils/format';
+import { dateTime, guestsLabel, longDate, plural, rateBreakdown, rupees, timeOnly } from '../utils/format';
 import { recallBookingEmail, rememberBookingEmail } from './bookingSession';
 
 const COPY = {
@@ -146,6 +146,10 @@ export default function BookingStatus() {
                 <div><dt>Check-in</dt><dd>{longDate(booking.check_in)}</dd></div>
                 <div><dt>Check-out</dt><dd>{longDate(booking.check_out)} · {plural(booking.nights, 'night')}</dd></div>
                 <div><dt>Guests</dt><dd>{guestsLabel(booking.adults, booking.children)}</dd></div>
+                {booking.single_room_count > 0 && (
+                  <div><dt>Rate</dt><dd>{rateBreakdown({ rate: booking.nightly_rate_paise, singleRate: booking.single_rate_paise, singles: booking.single_room_count, rooms: booking.room_count, nights: booking.nights })}</dd></div>
+                )}
+                {booking.inclusions && <div><dt>Includes</dt><dd>{booking.inclusions}</dd></div>}
                 <div><dt>Guest</dt><dd>{booking.guest_name}<br />{booking.guest_email} · {booking.guest_phone}</dd></div>
                 {booking.special_requests && <div><dt>Requests</dt><dd>{booking.special_requests}</dd></div>}
                 {booking.tax_paise > 0 && <div><dt>Taxes</dt><dd>{rupees(booking.tax_paise)}</dd></div>}

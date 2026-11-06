@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
-import { dateOnly, dateTime, guestsLabel, longDate, rupees, stayRange, timeOnly } from '../../utils/format';
+import { dateOnly, dateTime, guestsLabel, longDate, rateBreakdown, rupees, stayRange, timeOnly } from '../../utils/format';
 import { Can, useAuth } from '../auth';
 import { Badge, ConfirmDialog, Drawer, ExportButton, PAGE_SIZES, PageTitle, Pager, SearchBox, SortHeader, StateRow, useAdminList, useToast } from '../ui';
 
@@ -123,7 +123,8 @@ function BookingDetail({ id, onClose, onChanged }) {
                 <dt>Room</dt><dd>{b.room_count > 1 ? `${b.room_count} × ${b.room_type_name}` : b.room_type_name}</dd>
                 <dt>Dates</dt><dd>{longDate(b.check_in)} → {longDate(b.check_out)} ({b.nights} nights)</dd>
                 <dt>Guests</dt><dd>{guestsLabel(b.adults, b.children)}</dd>
-                <dt>Price</dt><dd>{rupees(b.nightly_rate_paise)} × {b.nights}{b.room_count > 1 ? ` × ${b.room_count} rooms` : ''} = {rupees(b.subtotal_paise)}{b.tax_paise ? ` + tax ${rupees(b.tax_paise)} (${Number(b.tax_percent)}%)` : ''}</dd>
+                {b.inclusions && <><dt>Includes</dt><dd>{b.inclusions}</dd></>}
+                <dt>Price</dt><dd>{rateBreakdown({ rate: b.nightly_rate_paise, singleRate: b.single_room_count ? b.single_rate_paise : null, singles: b.single_room_count, rooms: b.room_count, nights: b.nights })} = {rupees(b.subtotal_paise)}{b.tax_paise ? ` + tax ${rupees(b.tax_paise)} (${Number(b.tax_percent)}%)` : ''}</dd>
               </dl>
             </section>
             <section>

@@ -56,6 +56,7 @@ def _detail(db: Session, b: Booking) -> BookingDetail:
                         .order_by(PaymentEvent.id).limit(200)).scalars().all() if order_ids else []
     return BookingDetail(
         **_row(b), special_requests=b.special_requests, nightly_rate_paise=b.nightly_rate_paise,
+        single_room_count=b.single_room_count, single_rate_paise=b.single_rate_paise, inclusions=b.inclusions,
         subtotal_paise=b.subtotal_paise, tax_percent=b.tax_percent, tax_paise=b.tax_paise,
         hold_expires_at=b.hold_expires_at, confirmed_at=b.confirmed_at, cancelled_at=b.cancelled_at,
         cancel_reason=b.cancel_reason, terms_version=b.terms_version, terms_accepted_at=b.terms_accepted_at,

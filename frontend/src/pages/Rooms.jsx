@@ -5,6 +5,7 @@ import { useSite } from '../context/SiteContext';
 import { useApi } from '../hooks/useApi';
 import { usePageMotion } from '../motion/usePageMotion';
 import { siteApi } from '../services/api';
+import { tariffLine } from '../utils/format';
 
 export default function Rooms() {
   const { settings, loading: siteLoading } = useSite();
@@ -47,6 +48,12 @@ export default function Rooms() {
               </ul>
               <div className="price-row">
                 <Link className="btn" to={`/rooms?room=${encodeURIComponent(r.slug)}#book`}>Check Availability</Link>
+                {tariffLine(r.base_rate_paise, r.single_rate_paise, r.inclusions) && (
+                  <span className="price-row__rate">
+                    {[r.single_rate_paise != null && `${tariffLine(r.base_rate_paise, r.single_rate_paise, '')} per night`, r.inclusions]
+                      .filter(Boolean).join(' · ')}
+                  </span>
+                )}
               </div>
             </div>
           </div>

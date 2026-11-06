@@ -50,7 +50,11 @@ class Booking(TimestampMixin, Base):
     special_requests: Mapped[str | None] = mapped_column(Text)
 
     # Price snapshot taken from the database at booking time
-    nightly_rate_paise: Mapped[int] = mapped_column(Integer)
+    nightly_rate_paise: Mapped[int] = mapped_column(Integer)              # standard (double-occupancy) rate per room
+    # Rooms of the booking charged the single-occupancy rate (one adult), and that rate
+    single_room_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    single_rate_paise: Mapped[int | None] = mapped_column(Integer)
+    inclusions: Mapped[str | None] = mapped_column(String(255))           # as shown at booking time
     subtotal_paise: Mapped[int] = mapped_column(Integer)
     tax_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0"))
     tax_paise: Mapped[int] = mapped_column(Integer, default=0)

@@ -34,7 +34,11 @@ class RoomQuote(BaseModel):
     available_rooms: int
     bookable: bool
     nights: int
-    nightly_rate_paise: int
+    nightly_rate_paise: int               # standard / double-occupancy rate per room
+    single_rate_paise: int | None = None  # single-occupancy rate, if any
+    single_rooms: int = 0                 # rooms of this quote charged the single rate
+    nightly_total_paise: int = 0          # all rooms, one night
+    inclusions: str = ""
     subtotal_paise: int
     tax_percent: Decimal
     tax_paise: int
@@ -106,6 +110,9 @@ class BookingPublic(ORMModel):
     guest_phone: str
     special_requests: str | None
     nightly_rate_paise: int
+    single_room_count: int = 0
+    single_rate_paise: int | None = None
+    inclusions: str | None = None
     subtotal_paise: int
     tax_percent: Decimal
     tax_paise: int

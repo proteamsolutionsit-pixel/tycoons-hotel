@@ -5,7 +5,10 @@ import { Badge, PageTitle } from '../ui';
 const FIELDS = [
   { name: 'name', label: 'Name' },
   { name: 'slug', label: 'Slug (URL id)', createOnly: true, help: 'Lowercase letters, numbers and hyphens, e.g. junior-suite' },
-  { name: 'base_rate_paise', label: 'Rate per night, before tax', type: 'money', min: 1 },
+  { name: 'base_rate_paise', label: 'Standard / double-occupancy rate per night, before tax', type: 'money', min: 1 },
+  { name: 'single_rate_paise', label: 'Single-occupancy rate per night (one adult)', type: 'money', min: 1, nullable: true,
+    help: 'Leave empty to charge the standard rate for one adult too.' },
+  { name: 'inclusions', label: 'Included with the rate', wide: true, help: 'Shown with the price, e.g. "Complimentary breakfast". Leave empty for none.' },
   { name: 'total_rooms', label: 'Rooms available to sell', type: 'number', min: 0 },
   { name: 'max_adults', label: 'Max adults', type: 'number', min: 1 },
   { name: 'max_children', label: 'Max children', type: 'number', min: 0 },
@@ -31,7 +34,9 @@ export default function RoomTypes() {
         columns={[
           { label: 'Order', key: 'sort_order' },
           { label: 'Room', key: 'name' },
-          { label: 'Rate / night', sort: 'base_rate_paise', render: (r) => rupees(r.base_rate_paise) },
+          { label: 'Rate / night', sort: 'base_rate_paise', render: (r) => (r.single_rate_paise != null
+            ? <>{rupees(r.base_rate_paise)} <span className="adm-muted">double</span><br />{rupees(r.single_rate_paise)} <span className="adm-muted">single</span></>
+            : rupees(r.base_rate_paise)) },
           { label: 'Inventory', key: 'total_rooms' },
           { label: 'Sleeps', sort: 'max_adults', render: (r) => `${r.max_adults} + ${r.max_children}` },
           { label: 'Status', sort: 'is_active', render: (r) => <Badge value={r.is_active ? 'active' : 'hidden'} /> },

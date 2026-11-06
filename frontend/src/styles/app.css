@@ -188,3 +188,6 @@
   align-self: flex-start; margin: 0; padding: 4px 10px; background: var(--c-bg-alt);
   border-left: 2px solid var(--c-accent); color: var(--c-accent-ink); font-size: var(--t-xs); letter-spacing: 0.02em;
 }
+
+/* Results: tariff by occupancy and what the rate includes */
+.quote-tariff { margin: 0; font-size: var(--t-xs); color: var(--c-accent-ink); letter-spacing: 0.02em; line-height: 1.6; }

@@ -69,9 +69,73 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0019 — Occupancy-based room rates (single / double) and rate inclusions; Twin Room tariff
+- **Date:** 2026-11-06 · **Version:** API 1.1.0 · **Module:** Rooms & rates, availability/pricing, booking, public site, admin
+- **Change type:** Feature, Database, API · **Environment:** Development · **Status:** Tested (not yet deployed to staging)
+- **Related commit:** see `git log` (commit following `ee04df0`) · **Feature:** FEAT-0012
+
+**Reason:** The hotel set the Twin Room tariff by occupancy — single occupancy ₹3,500 per night, double occupancy
+₹4,500 per night, complimentary breakfast with both — and the price shown and charged must follow the occupancy.
+
+**Previous behaviour:** One rate per room type (`base_rate_paise`), charged per room regardless of how many adults
+it held. No way to state what the rate includes. The public Rooms page showed no prices.
+
+**New behaviour:**
+- Each room type has an optional **single-occupancy rate** (one adult in the room) next to the standard rate,
+  which is now labelled the **double-occupancy / standard** rate, and an **inclusions** text.
+- The server prices each room by its adults: a room holding one adult is charged the single rate when the
+  room type has one, otherwise the standard rate. With several rooms, adults are spread as evenly as possible
+  (3 adults in 2 rooms = 1 double + 1 single). **Children do not change the occupancy rate** (assumption — see Open items).
+- Booking page: price for the party per night with "single occupancy" / "double occupancy" or "for 2 rooms",
+  a tariff line ("Single occupancy ₹3,500 · Double occupancy ₹4,500 · Complimentary breakfast"), and a summary
+  breakdown such as "(₹4,500 double + ₹3,500 single) × 1 night = ₹8,000" plus an *Includes* row.
+- Rooms page: the tariff appears in the original design's `price-row__rate` slot beside *Check Availability*,
+  only for room types with a single rate or inclusions configured (other rooms' prices stay unpublished).
+- The booking records the single-rate rooms, the single rate and the inclusions as quoted; the guest's
+  booking page, the admin booking detail and the confirmation email show them.
+- Admin > Rooms & rates: fields *Single-occupancy rate per night (one adult)* (empty = standard rate) and
+  *Included with the rate*; the list shows both rates.
+
+**Files modified:**
+`backend/alembic/versions/20261106_4e8b1d6f2c30_occupancy_rates.py` (new), `backend/app/models/room.py`,
+`backend/app/models/booking.py`, `backend/app/services/availability.py`, `backend/app/services/booking_service.py`,
+`backend/app/services/notifications.py`, `backend/app/schemas/booking.py`, `backend/app/schemas/admin.py`,
+`backend/app/schemas/content.py`, `backend/app/api/routes/admin/bookings.py`, `backend/tests/test_occupancy_rates.py` (new),
+`frontend/src/utils/format.js`, `frontend/src/pages/Book.jsx`, `frontend/src/pages/BookingStatus.jsx`,
+`frontend/src/pages/Rooms.jsx`, `frontend/src/admin/pages/Bookings.jsx`, `frontend/src/admin/pages/RoomTypes.jsx`,
+`frontend/src/styles/app.css`, `frontend/src/test/format.test.js`, `CHANGELOG.md`
+
+**Security impact:** Prices remain computed server-side from the database; the client cannot choose the rate.
+The occupancy split is derived from the validated party, not from client input.
+**Database impact:** DB-0006 — five new columns, all optional or defaulted; existing prices and bookings unchanged.
+**API impact:** `RoomQuote` gains `single_rate_paise`, `single_rooms`, `nightly_total_paise`, `inclusions`;
+`GET /rooms` gains `single_rate_paise`, `inclusions`; booking and admin booking responses gain `single_room_count`,
+`single_rate_paise`, `inclusions`; room-type admin create/update accept `single_rate_paise`, `inclusions`. Additive.
+**Configuration impact:** None.
+
+**Testing performed:**
+- Backend: new `test_occupancy_rates.py` (5 tests: even split; single rate only for one-adult rooms; availability
+  for 1/2 adults and with a child; booking charges and records ₹3,500; admin edit, public API, clearing the
+  single rate falls back) together with `test_multi_room.py` and `test_bookings.py`: **27 passed**.
+  Full backend suite (MySQL 8.4): **389 passed**.
+- Frontend: **30 passed** (new tests for the tariff line and the rate breakdown).
+- Browser (Edge, local): entered ₹4,500 / ₹3,500 / "Complimentary breakfast" on Twin Room in the admin form;
+  Rooms page shows "Single occupancy ₹3,500 · Double occupancy ₹4,500 per night · Complimentary breakfast";
+  `/book` Twin Room: 1 adult ₹3,500 (single), 2 adults ₹4,500 (double), 3 adults ₹8,000 for 2 rooms
+  "(₹4,500 double + ₹3,500 single) × 1 night"; no page errors.
+- Local database migrated (backup `backups/tycoons-20261106T053008Z.sql`).
+
+**Deployment notes:** Back up → `migrate.py` (revision `4e8b1d6f2c30`) → release → restart. Then enter the Twin
+Room tariff in Admin > Rooms & rates (or via the admin API): standard ₹4,500, single ₹3,500, inclusions
+"Complimentary breakfast". Until entered, staging prices are unchanged.
+**Rollback plan:** Clear the single rate in the admin to return to one rate; or `alembic downgrade 9d4f2a7c1e85`
+(drops the columns; stored booking totals remain) and redeploy the previous release.
+
+---
+
 ### CHG-0018 — Centralised CHANGELOG.md introduced
 - **Date:** 2026-10-26 · **Version:** n/a · **Module:** Documentation · **Change type:** Documentation
-- **Environment:** Repository · **Status:** Implemented · **Related commit:** this commit
+- **Environment:** Repository · **Status:** Implemented · **Related commit:** `ee04df0`
 
 **Reason:** A single traceable record of all changes and security work was requested.
 **Previous behaviour:** History lived only in commit messages, `docs/AUDIT.md` and chat.
@@ -476,6 +540,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Feature | Requirement | Behaviour | Change | Config needed | Tests | Release status |
 |---|---|---|---|---|---|---|---|
+| FEAT-0012 | Occupancy-based rates + inclusions | Twin Room: single ₹3,500, double ₹4,500, breakfast included | Single rate for one-adult rooms; tariff and breakdown shown | CHG-0019 | Enter rates per room type in the admin | 389 backend, 30 frontend | Tested; not deployed |
 | FEAT-0011 | Multi-room bookings | Offer enough rooms when a party exceeds one room | Fewest rooms per type; one payment | CHG-0017 | `MAX_ROOMS_PER_BOOKING` (optional) | 384 backend, 28 frontend | Deployed (staging) |
 | FEAT-0010 | Guest steppers; chosen room first | Any party size; respect selection | − / + adults & children; chosen room first | CHG-0016 | — | 28 frontend | Deployed (staging) |
 | FEAT-0009 | Roles & access | Per-user access | Custom roles, permission checklist | CHG-0014 | — | 373 backend, 26 frontend | Deployed (staging) |
@@ -497,6 +562,7 @@ using the schema-owner account; **back up first**. Order on deploy: migration, t
 
 | ID | Revision | Date | Change | Data transformation | Rollback | Staging |
 |---|---|---|---|---|---|---|
+| DB-0006 | `4e8b1d6f2c30` | 2026-11-06 | `room_types.single_rate_paise` (NULL), `room_types.inclusions` ('') + check single rate ≥ 0; `bookings.single_room_count` (0), `bookings.single_rate_paise` (NULL), `bookings.inclusions` (NULL) | None | `alembic downgrade 9d4f2a7c1e85` | Not yet applied (applied locally 2026-11-06) |
 | DB-0005 | `9d4f2a7c1e85` | 2026-10-26 | `bookings.room_count INT NOT NULL DEFAULT 1` + check `room_count >= 1` | None (existing = 1) | `alembic downgrade 7b1e4c2d9a60` (multi-room bookings read as 1 room) | Applied 2026-10-26 after backup `tycoons-20261026T070541Z.sql.gz` |
 | DB-0004 | `7b1e4c2d9a60` | 2026-10-26 | `roles` table; `admin_users.role_id` (FK RESTRICT, indexed) | Inserts Administrator & Front desk; sets every user's `role_id` from `role` | `alembic downgrade 3c7d9a51f0b2` (custom roles lost) | Applied 2026-10-26 after backup `tycoons-20261026T054816Z.sql.gz` |
 | DB-0003 | `3c7d9a51f0b2` | 2026-10-24 | `payment_gateway_settings` (single row; encrypted secret columns) | None | `alembic downgrade e52a1c1bd47a` (saved keys lost) | Applied 2026-10-26 after backup `tycoons-20261026T035748Z.sql.gz` |
@@ -513,6 +579,7 @@ Base path `/api/v1` (legacy `/api/...` still answers with `Deprecation: true`).
 
 | Date | Change | Endpoint(s) | Auth | Compatibility |
 |---|---|---|---|---|
+| 2026-11-06 | Occupancy rates | `GET /bookings/availability` quotes gain `single_rate_paise`, `single_rooms`, `nightly_total_paise`, `inclusions`; `GET /rooms` gains `single_rate_paise`, `inclusions`; booking responses gain `single_room_count`, `single_rate_paise`, `inclusions`; `POST/PATCH /admin/room-types` accept `single_rate_paise`, `inclusions` | Public / `catalog.manage` | Additive |
 | 2026-10-26 | Multi-room quotes and bookings | `GET /bookings/availability` → `room_count`, `max_rooms`; `POST /bookings` accepts `room_count`; booking & admin responses gain `room_count` | Public / admin | Additive |
 | 2026-10-26 | Email editable | `PATCH /admin/users/{id}` accepts `email` (409 `duplicate_email`, 403 `target_exceeds_own_access`) | `users.manage` | Additive |
 | 2026-10-26 | Roles | `GET/POST /admin/roles`, `PATCH/DELETE /admin/roles/{id}`, `GET /admin/roles/permissions`; users accept `role_id`; `AdminUserOut.role_id`, `role_name`; new 403 codes `role_exceeds_own_access`, `target_exceeds_own_access`; 409 `last_admin`, `system_role`, `in_use` | `users.manage` (read), `roles.manage` (write) | Additive; legacy `role` still accepted |
@@ -597,6 +664,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | Item | Detail | Owner |
 |---|---|---|
+| Child pricing (CHG-0019) | Children do not change the occupancy rate (1 adult + 1 child pays the single rate). Confirm with the hotel; changing it is a one-line rule in `availability.quote` | Hotel |
 | GitHub push pending | Repository created; push blocked because the signed-in GitHub account lacks write access. Needs the owner account to push, or collaborator access | Project owner |
 | Razorpay keys | Staging uses test payments; live/test keys to be entered in Admin > Payment gateway | Hotel |
 | Email (SMTP) | Not configured; confirmation and password-reset emails are logged, not sent | Hotel / IT |
