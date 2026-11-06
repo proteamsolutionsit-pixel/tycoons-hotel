@@ -71,8 +71,8 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ### CHG-0020 — Multiple landline numbers in site settings
 - **Date:** 2026-11-06 · **Version:** API 1.1.0 · **Module:** Site settings, public site (footer, Contact page)
-- **Change type:** Feature, Configuration · **Environment:** Development · **Status:** Tested
-- **Related commit:** see `git log` · **Feature:** FEAT-0013
+- **Change type:** Feature, Configuration · **Environment:** Development, Staging · **Status:** Deployed (staging)
+- **Related commit:** `c9a3da8` · **Feature:** FEAT-0013 · **Release:** REL-0010
 
 **Reason:** The hotel needs to publish more than one landline number.
 **Previous behaviour:** One reservations phone (`phone_display` / `phone_tel`), plus single Fishy Tales and spa phones.
@@ -103,6 +103,9 @@ validates as above (422 on invalid input). Additive.
 - Browser (Edge, local): saved Reception 080 4123 4567 and Front office 080 4123 4568; "call us" refused with a message;
   Contact page and footer show both with `tel:08041234567` / `tel:08041234568`; no page errors.
 **Deployment notes:** Release → restart → run `python -m app.cli seed` once (adds the setting) → enter numbers in the admin.
+Done on staging 2026-11-06 (REL-0010): seed output `{'site_settings': 1}` after backup `tycoons-20261106T062400Z.sql.gz`.
+Staging check: `GET /site` returns the placeholder row; admin lists *Landline numbers* under Contact details;
+an invalid number is refused (422, nothing saved). Real numbers not yet entered (hotel to supply).
 **Rollback plan:** Redeploy the previous release; the extra setting row is ignored by older code (can be deleted).
 
 ---
@@ -580,7 +583,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Feature | Requirement | Behaviour | Change | Config needed | Tests | Release status |
 |---|---|---|---|---|---|---|---|
-| FEAT-0013 | Multiple landline numbers | Publish several landlines | Labelled numbers in footer and Contact page, tel: links | CHG-0020 | Enter numbers in Site settings | 5 backend, 31 frontend | Tested |
+| FEAT-0013 | Multiple landline numbers | Publish several landlines | Labelled numbers in footer and Contact page, tel: links | CHG-0020 | Enter numbers in Site settings | 394 backend, 31 frontend | Deployed (staging) |
 | FEAT-0012 | Occupancy-based rates + inclusions | Twin Room: single ₹3,500, double ₹4,500, breakfast included | Single rate for one-adult rooms; tariff and breakdown shown | CHG-0019 | Enter rates per room type in the admin | 389 backend, 30 frontend | Deployed (staging) |
 | FEAT-0011 | Multi-room bookings | Offer enough rooms when a party exceeds one room | Fewest rooms per type; one payment | CHG-0017 | `MAX_ROOMS_PER_BOOKING` (optional) | 384 backend, 28 frontend | Deployed (staging) |
 | FEAT-0010 | Guest steppers; chosen room first | Any party size; respect selection | − / + adults & children; chosen room first | CHG-0016 | — | 28 frontend | Deployed (staging) |
@@ -686,6 +689,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0010 | 2026-11-06 | `tycoons-20261106T062024Z` | CHG-0020 (+ `app.cli seed`: 1 setting added) | — | Setting present; invalid number 422; bundle matched |
 | REL-0009 | 2026-11-06 | `tycoons-20261106T054735Z` | CHG-0019 (+ Twin Room tariff entered) | `4e8b1d6f2c30` | Twin: 1 adult ₹3,500, 2 adults ₹4,500, 3 adults ₹8,000/2 rooms; bundle matched |
 | REL-0008 | 2026-10-26 | `tycoons-20261026T070733Z` | CHG-0017 | `9d4f2a7c1e85` | Availability for 2/4/3+2/1+3 guests as expected; admin pages 200 |
 | REL-0007 | 2026-10-26 | `tycoons-20261026T061633Z` | CHG-0016 | — | Live bundle = local build; ready 200 |
