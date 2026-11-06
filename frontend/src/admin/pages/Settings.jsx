@@ -5,6 +5,10 @@ import { api } from '../../services/api';
 import { useAuth } from '../auth';
 import { Notice, PageTitle, useAdminList, useToast } from '../ui';
 
+// Settings edited as label/value rows even when they currently hold no rows
+const PAIR_KEYS = new Set(['landline_numbers', 'stay_details', 'getting_here', 'dining_details', 'spa_details']);
+const PAIR_LABELS = { landline_numbers: ['Label (e.g. Reception)', 'Number (with STD code)'] };
+
 const GROUPS = { contact: 'Contact details', social: 'Social links', home: 'Homepage', rooms: 'Rooms & booking',
   dining: 'Fishy Tales', wellness: 'Kai Wellness Spa', lounge: 'Business Lounge', general: 'General' };
 
@@ -35,7 +39,9 @@ function SettingEditor({ setting }) {
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => setValue(setting.value), [setting.value]);
-  const isPairs = Array.isArray(setting.value) && setting.value.length > 0 && typeof setting.value[0] === 'object';
+  const isPairs = Array.isArray(setting.value) && (PAIR_KEYS.has(setting.key)
+    || (setting.value.length > 0 && typeof setting.value[0] === 'object'));
+  const [labelHint, valueHint] = PAIR_LABELS[setting.key] || ['Label', 'Value'];
   const isList = Array.isArray(setting.value) && !isPairs;
   const isNumber = typeof setting.value === 'number';
   const dirty = JSON.stringify(value) !== JSON.stringify(setting.value);
@@ -60,14 +66,15 @@ function SettingEditor({ setting }) {
       <div className="adm-pairs">
         {value.map((row, i) => (
           <div className="adm-pair" key={i}>
-            <input className="adm-input" aria-label="Label" value={row.label} disabled={!isAdmin}
+            <input className="adm-input" aria-label={labelHint} placeholder={labelHint} value={row.label} disabled={!isAdmin}
               onChange={(e) => setValue(value.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)))} />
-            <input className="adm-input" aria-label="Value" value={row.value} disabled={!isAdmin}
+            <input className="adm-input" aria-label={valueHint} placeholder={valueHint} value={row.value} disabled={!isAdmin}
+              inputMode={setting.key === 'landline_numbers' ? 'tel' : undefined}
               onChange={(e) => setValue(value.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)))} />
             {isAdmin && <button type="button" className="adm-btn adm-btn--ghost" onClick={() => setValue(value.filter((_, j) => j !== i))}>Remove</button>}
           </div>
         ))}
-        {isAdmin && <button type="button" className="adm-btn adm-btn--ghost" style={{ justifySelf: 'start' }} onClick={() => setValue([...value, { label: '', value: '' }])}>Add row</button>}
+        {isAdmin && <button type="button" className="adm-btn adm-btn--ghost" style={{ justifySelf: 'start' }} onClick={() => setValue([...value, { label: '', value: '' }])}>{setting.key === 'landline_numbers' ? 'Add number' : 'Add row'}</button>}
       </div>
     );
   } else if (isList) {

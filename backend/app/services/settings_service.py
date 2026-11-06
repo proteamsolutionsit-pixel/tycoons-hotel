@@ -11,6 +11,8 @@ from app.core.errors import AppError, NotFound
 from app.models import AdminUser, SiteSetting
 from app.services import audit
 
+_PHONE = re.compile(r"^\+?\(?[0-9][0-9 ()./-]{4,23}[0-9]$")
+MAX_LANDLINES = 10
 _GOOGLE_MAPS_EMBED = re.compile(r"^https://(www\.)?google\.[a-z.]{2,10}/maps/embed\?[^\s<>\"']{1,1500}$")
 
 
@@ -29,6 +31,19 @@ def validate(row: SiteSetting, value: Any) -> None:
     if row.key == "map_embed_url":
         if value and (not isinstance(value, str) or not _GOOGLE_MAPS_EMBED.match(value)):
             _bad("Use the src of a Google Maps embed (https://www.google.com/maps/embed?…).")
+        return
+    if row.key == "landline_numbers":
+        if not isinstance(value, list) or len(value) > MAX_LANDLINES:
+            _bad(f"Enter up to {MAX_LANDLINES} numbers.")
+        for item in value:
+            if not (isinstance(item, dict) and set(item) <= {"label", "value"}
+                    and isinstance(item.get("label"), str) and isinstance(item.get("value"), str)):
+                _bad("Each row needs a label and a number.")
+            label, number = item["label"].strip(), item["value"].strip()
+            if not 1 <= len(label) <= 60:
+                _bad("Give each number a label of up to 60 characters, e.g. Reception.")
+            if not (number.startswith("[") or _PHONE.match(number)):
+                _bad(f"“{number[:30]}” is not a phone number. Use digits with the STD code, e.g. 080 4123 4567.")
         return
     if row.key == "cancellation_policy":
         if not isinstance(value, str) or not 3 <= len(value.strip()) <= 4000:

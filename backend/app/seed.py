@@ -116,6 +116,9 @@ SETTINGS = [
     ("address_region_pin", "Karnataka [PIN]", "State and PIN", "contact", None),
     ("phone_display", "[+91 Phone]", "Reservations phone (as shown)", "contact", None),
     ("phone_tel", "+910000000000", "Reservations phone (dialled)", "contact", "Digits with country code, e.g. +918012345678"),
+    ("landline_numbers", [{"label": "Reception", "value": "[Landline number]"}], "Landline numbers", "contact",
+     "One row per number: a label (e.g. Reception, Front office) and the number with its STD code, e.g. 080 4123 4567. "
+     "Shown in the footer and on the Contact page."),
     ("reservations_email_display", "[Reservations email]", "Reservations email (as shown)", "contact", None),
     ("reservations_email", "reservations@example.com", "Reservations email (address)", "contact", None),
     ("dining_phone_display", "[+91 Phone]", "Fishy Tales phone", "contact", None),

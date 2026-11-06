@@ -25,6 +25,10 @@ export function useContact() {
     regionPin: s.address_region_pin || '',
     phone: s.phone_display || '',
     tel: s.phone_tel ? 'tel:' + String(s.phone_tel).replace(/[^\d+]/g, '') : undefined,
+    // Extra landlines: rows with a real number (placeholders like "[Landline number]" have no tel: link)
+    landlines: (Array.isArray(s.landline_numbers) ? s.landline_numbers : [])
+      .filter((r) => r && r.value)
+      .map((r) => ({ label: r.label, number: r.value, tel: /\d/.test(r.value) ? 'tel:' + r.value.replace(/[^\d+]/g, '') : undefined })),
     email: s.reservations_email_display || '',
     mailto: s.reservations_email ? 'mailto:' + s.reservations_email : undefined,
   };

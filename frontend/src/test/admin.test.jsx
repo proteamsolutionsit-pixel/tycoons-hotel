@@ -295,3 +295,29 @@ describe('Roles & access', () => {
     expect(screen.queryByRole('button', { name: /Save role/ })).not.toBeInTheDocument();
   });
 });
+
+describe('Landline numbers setting', () => {
+  const ADMIN = { ...STAFF, id: 1, role: 'admin', permissions: [...STAFF.permissions, 'settings.manage'] };
+  it('adds numbers as label + number rows, even when none are saved', async () => {
+    const user = userEvent.setup();
+    const puts = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, init = {}) => {
+      const u = String(url);
+      if (u.includes('/auth/me')) return json(200, ADMIN);
+      if (u.includes('/settings/landline_numbers') && init.method === 'PUT') { const b = JSON.parse(init.body); puts.push(b); return json(200, { key: 'landline_numbers', ...b }); }
+      if (u.includes('/admin/settings')) {
+        return json(200, [{ key: 'landline_numbers', value: [], label: 'Landline numbers', group: 'contact', help_text: 'One row per number', sort_order: 1 }]);
+      }
+      return json(404, { error: { code: 'not_found', message: 'nope' } });
+    });
+    render(<MemoryRouter initialEntries={['/admin/settings']}><Routes><Route path="/admin/*" element={<AdminApp />} /></Routes></MemoryRouter>);
+    await user.click(await screen.findByRole('button', { name: 'Add number' }));
+    await user.click(screen.getByRole('button', { name: 'Add number' }));
+    const labels = screen.getAllByLabelText('Label (e.g. Reception)');
+    const numbers = screen.getAllByLabelText('Number (with STD code)');
+    await user.type(labels[0], 'Reception'); await user.type(numbers[0], '080 4123 4567');
+    await user.type(labels[1], 'Banquets'); await user.type(numbers[1], '080 4123 4569');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(puts[0].value).toEqual([{ label: 'Reception', value: '080 4123 4567' }, { label: 'Banquets', value: '080 4123 4569' }]);
+  });
+});

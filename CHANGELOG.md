@@ -69,6 +69,44 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0020 — Multiple landline numbers in site settings
+- **Date:** 2026-11-06 · **Version:** API 1.1.0 · **Module:** Site settings, public site (footer, Contact page)
+- **Change type:** Feature, Configuration · **Environment:** Development · **Status:** Tested
+- **Related commit:** see `git log` · **Feature:** FEAT-0013
+
+**Reason:** The hotel needs to publish more than one landline number.
+**Previous behaviour:** One reservations phone (`phone_display` / `phone_tel`), plus single Fishy Tales and spa phones.
+**New behaviour:** New setting **Landline numbers** (*Site settings → Contact details*): any number of rows
+(up to 10), each a label (e.g. Reception, Front office) and a number. Shown in the footer's Contact column
+("Reception · 080 4123 4567") and as rows on the Contact page, each a `tel:` link. Placeholder rows without
+digits are shown as text without a link. The editor stays in label/number mode even when all rows are removed
+(previously an emptied list of rows would have switched to the one-item-per-line editor).
+**Implementation details:** Seeded as `[{"label": "Reception", "value": "[Landline number]"}]`; existing databases get
+it from `python -m app.cli seed`, which only inserts missing settings. Server-side validation for this key:
+list of ≤ 10 `{label, value}` objects, label 1–60 chars, number matching `^\+?\(?[0-9][0-9 ()./-]{4,23}[0-9]$`
+(or a `[placeholder]`).
+**Files modified:** `backend/app/seed.py`, `backend/app/services/settings_service.py`, `backend/tests/test_landlines.py` (new),
+`frontend/src/admin/pages/Settings.jsx`, `frontend/src/context/SiteContext.jsx`, `frontend/src/components/Footer.jsx`,
+`frontend/src/pages/Contact.jsx`, `frontend/src/test/admin.test.jsx`, `CHANGELOG.md`
+**Security impact:** Input is allow-listed server-side (labels length-limited, numbers restricted to digits and
+phone punctuation), so the setting cannot carry markup or arbitrary links; React escapes output. Editing needs
+`settings.manage`; changes are audited (`setting.update`).
+**Database impact:** No schema change. One new `site_settings` row (data insert via seed).
+**API impact:** `GET /site` settings gain `landline_numbers` (array of `{label, value}`); `PUT /admin/settings/landline_numbers`
+validates as above (422 on invalid input). Additive.
+**Configuration impact:** None (content is managed in the admin).
+**Testing performed:**
+- Backend `test_landlines.py` (5 tests: seeded row; save 3 numbers incl. `+91 …` and `(080) …` forms, public API,
+  audit; clear all; 5 invalid inputs → 422; staff → 403) with `test_admin.py`: all passed (initial run found the
+  `(080)` form refused — pattern fixed, then 5/5 passed). Full backend suite (MySQL 8.4): **394 passed**.
+- Frontend: **31 passed** (new: editor adds two numbers from an empty setting and saves them as rows).
+- Browser (Edge, local): saved Reception 080 4123 4567 and Front office 080 4123 4568; "call us" refused with a message;
+  Contact page and footer show both with `tel:08041234567` / `tel:08041234568`; no page errors.
+**Deployment notes:** Release → restart → run `python -m app.cli seed` once (adds the setting) → enter numbers in the admin.
+**Rollback plan:** Redeploy the previous release; the extra setting row is ignored by older code (can be deleted).
+
+---
+
 ### CHG-0019 — Occupancy-based room rates (single / double) and rate inclusions; Twin Room tariff
 - **Date:** 2026-11-06 · **Version:** API 1.1.0 · **Module:** Rooms & rates, availability/pricing, booking, public site, admin
 - **Change type:** Feature, Database, API · **Environment:** Development, Staging · **Status:** Deployed (staging)
@@ -542,6 +580,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Feature | Requirement | Behaviour | Change | Config needed | Tests | Release status |
 |---|---|---|---|---|---|---|---|
+| FEAT-0013 | Multiple landline numbers | Publish several landlines | Labelled numbers in footer and Contact page, tel: links | CHG-0020 | Enter numbers in Site settings | 5 backend, 31 frontend | Tested |
 | FEAT-0012 | Occupancy-based rates + inclusions | Twin Room: single ₹3,500, double ₹4,500, breakfast included | Single rate for one-adult rooms; tariff and breakdown shown | CHG-0019 | Enter rates per room type in the admin | 389 backend, 30 frontend | Deployed (staging) |
 | FEAT-0011 | Multi-room bookings | Offer enough rooms when a party exceeds one room | Fewest rooms per type; one payment | CHG-0017 | `MAX_ROOMS_PER_BOOKING` (optional) | 384 backend, 28 frontend | Deployed (staging) |
 | FEAT-0010 | Guest steppers; chosen room first | Any party size; respect selection | − / + adults & children; chosen room first | CHG-0016 | — | 28 frontend | Deployed (staging) |
@@ -581,6 +620,7 @@ Base path `/api/v1` (legacy `/api/...` still answers with `Deprecation: true`).
 
 | Date | Change | Endpoint(s) | Auth | Compatibility |
 |---|---|---|---|---|
+| 2026-11-06 | Landline numbers | `GET /site` → `settings.landline_numbers` `[{label, value}]`; `PUT /admin/settings/landline_numbers` validated (422) | Public / `settings.manage` | Additive |
 | 2026-11-06 | Occupancy rates | `GET /bookings/availability` quotes gain `single_rate_paise`, `single_rooms`, `nightly_total_paise`, `inclusions`; `GET /rooms` gains `single_rate_paise`, `inclusions`; booking responses gain `single_room_count`, `single_rate_paise`, `inclusions`; `POST/PATCH /admin/room-types` accept `single_rate_paise`, `inclusions` | Public / `catalog.manage` | Additive |
 | 2026-10-26 | Multi-room quotes and bookings | `GET /bookings/availability` → `room_count`, `max_rooms`; `POST /bookings` accepts `room_count`; booking & admin responses gain `room_count` | Public / admin | Additive |
 | 2026-10-26 | Email editable | `PATCH /admin/users/{id}` accepts `email` (409 `duplicate_email`, 403 `target_exceeds_own_access`) | `users.manage` | Additive |

@@ -24,6 +24,9 @@ export default function Contact() {
             <dl className="contact-list">
               <div><dt>Address</dt><dd>{c.street}<br />{c.city}{c.city && c.regionPin ? ', ' : ''}{c.regionPin}</dd></div>
               <div><dt>Reservations</dt><dd>{c.phone} · {c.email}</dd></div>
+              {c.landlines.map((l, i) => (
+                <div key={i}><dt>{l.label || 'Landline'}</dt><dd>{l.tel ? <a className="u-draw" href={l.tel}>{l.number}</a> : l.number}</dd></div>
+              ))}
               <div><dt>Fishy Tales</dt><dd>{settings.dining_phone_display}</dd></div>
               <div><dt>Kai Wellness Spa</dt><dd>{settings.spa_phone_display}</dd></div>
             </dl>
