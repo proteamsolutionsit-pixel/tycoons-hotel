@@ -35,7 +35,7 @@ export default function Header({ onOpenMenu, menuOpen, menuButtonRef }) {
     <header className="site-header" id="top" ref={ref}>
       <div className="site-header__bg" aria-hidden="true" />
       <div className="utility wrap">
-        <span>{c.street}{c.street && c.city ? ', ' : ''}{c.city}</span>
+        <span className="utility__address" title={`${c.street}${c.street && c.city ? ', ' : ''}${c.city}`}>{c.street}{c.street && c.city ? ', ' : ''}{c.city}</span>
         <div className="utility__links">
           <a className="u-draw" href={c.tel}>{c.phone}</a>
           <a className="u-draw" href={c.mailto}>{c.email}</a>

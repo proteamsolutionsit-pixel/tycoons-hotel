@@ -69,6 +69,23 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0021 — Header strip: phone number and email stay on one line
+- **Date:** 2026-11-06 · **Module:** Public site — header utility strip · **Change type:** Bug Fix
+- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** see `git log` · **Bug:** BUG-0012 · **Release:** REL-0011
+
+**Reason:** On staging the reservations phone "+91 9364789448" broke onto two lines in the top strip.
+**Previous behaviour:** The long street address took the space and squeezed the phone and email links, which wrapped.
+**New behaviour:** Phone and email never wrap or shrink; the address takes the remaining space and ends with "…"
+when it doesn't fit (full address on hover, and in full in the footer and on the Contact page).
+**Files modified:** `frontend/src/components/Header.jsx`, `frontend/src/styles/app.css` (original `site.css` untouched), `CHANGELOG.md`
+**Security / database / API / configuration impact:** None.
+**Testing performed:** Frontend **31 passed**. Browser (Edge, local, with the staging address and phone injected):
+at 1920, 1440, 1280 and 1100 px the phone and email are one line (21 px high), the strip stays 40 px;
+the address is shortened from 1280 px down.
+**Deployment notes:** Frontend only. **Rollback:** redeploy the previous release.
+
+---
+
 ### CHG-0020 — Multiple landline numbers in site settings
 - **Date:** 2026-11-06 · **Version:** API 1.1.0 · **Module:** Site settings, public site (footer, Contact page)
 - **Change type:** Feature, Configuration · **Environment:** Development, Staging · **Status:** Deployed (staging)
@@ -565,6 +582,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Description | Reproduce | Root cause | Fix | Files | Regression tests | Status |
 |---|---|---|---|---|---|---|---|
+| BUG-0012 | Phone number wrapped onto two lines in the header strip | Long street address on a desktop screen | Address and links shared a fixed-height flex row; links could shrink | Links `white-space: nowrap` and non-shrinking; address truncates with ellipsis | `Header.jsx`, `app.css` | Browser widths 1100–1920 | Fixed; deployed (CHG-0021) |
 | BUG-0011 | Audit details of a role update lost the permission lists | Update a role's permissions; read `role.update` details | Audit sanitiser trims nesting deeper than 3 levels | Flattened to `permissions_added` / `permissions_removed` | `role_service.py` | `test_role_changes_apply_on_the_next_request` | Fixed before release (CHG-0014) |
 | BUG-0010 | Blank admin page for a role without the dashboard | Sign in as such a role; open a page it may not see | Guard redirected to `/admin`, which the role also cannot see | Redirect to the first permitted menu page; message if none | `AdminApp.jsx` | Browser check (redirect to Occupancy) | Fixed before release (CHG-0014) |
 | BUG-0009 | Occupancy calendar crash after multi-room change | Open occupancy with bookings | Room-count variable reused the loop's date variable name | Renamed | `dashboard.py` | `test_paid_two_room_booking_counts_two_in_admin` | Fixed before release (CHG-0017) |

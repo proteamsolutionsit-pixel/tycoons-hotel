@@ -191,3 +191,8 @@
 
 /* Results: tariff by occupancy and what the rate includes */
 .quote-tariff { margin: 0; font-size: var(--t-xs); color: var(--c-accent-ink); letter-spacing: 0.02em; line-height: 1.6; }
+
+/* Header utility strip: phone and email always on one line; a long address shortens with an ellipsis */
+.utility__address { flex: 1 1 auto; min-width: 0; margin-right: var(--s-6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.utility__links { flex: 0 0 auto; }
+.utility__links a { white-space: nowrap; }
