@@ -71,7 +71,7 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ### CHG-0021 — Header strip: phone number and email stay on one line
 - **Date:** 2026-11-06 · **Module:** Public site — header utility strip · **Change type:** Bug Fix
-- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** see `git log` · **Bug:** BUG-0012 · **Release:** REL-0011
+- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** `cbe0ab2` · **Bug:** BUG-0012 · **Release:** REL-0011
 
 **Reason:** On staging the reservations phone "+91 9364789448" broke onto two lines in the top strip.
 **Previous behaviour:** The long street address took the space and squeezed the phone and email links, which wrapped.
@@ -707,6 +707,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0011 | 2026-11-06 | `tycoons-20261106T063307Z` | CHG-0021 | — | Live CSS contains the fix; bundle matched; ready 200 |
 | REL-0010 | 2026-11-06 | `tycoons-20261106T062024Z` | CHG-0020 (+ `app.cli seed`: 1 setting added) | — | Setting present; invalid number 422; bundle matched |
 | REL-0009 | 2026-11-06 | `tycoons-20261106T054735Z` | CHG-0019 (+ Twin Room tariff entered) | `4e8b1d6f2c30` | Twin: 1 adult ₹3,500, 2 adults ₹4,500, 3 adults ₹8,000/2 rooms; bundle matched |
 | REL-0008 | 2026-10-26 | `tycoons-20261026T070733Z` | CHG-0017 | `9d4f2a7c1e85` | Availability for 2/4/3+2/1+3 guests as expected; admin pages 200 |
