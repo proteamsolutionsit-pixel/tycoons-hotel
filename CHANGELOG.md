@@ -753,7 +753,6 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | Item | Detail | Owner |
 |---|---|---|
-| cPanel API token refused (2026-11-11) | `cpanel.txt` token returns HTTP 403 "Access denied" — revoked, expired or IP-restricted. Deployments blocked until a new token is created (site unaffected) | Project owner |
 | Child pricing (CHG-0019) | Children do not change the occupancy rate (1 adult + 1 child pays the single rate). Confirm with the hotel; changing it is a one-line rule in `availability.quote` | Hotel |
 | Razorpay keys | Staging uses test payments; live/test keys to be entered in Admin > Payment gateway | Hotel |
 | Email (SMTP) | Not configured; confirmation and password-reset emails are logged, not sent | Hotel / IT |
