@@ -69,9 +69,23 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0025 — Contact page map set to the hotel's location (content)
+- **Date:** 2026-11-11 · **Module:** Site settings (content) · **Change type:** Configuration (data)
+- **Environment:** Staging · **Status:** Deployed (staging) · **Related commit:** none (content change, no code)
+
+**Reason:** The hotel supplied its Google Maps embed.
+**Change:** Site setting `map_embed_url` (was empty) set through the admin API (audited as `setting.update`) to the
+`src` of the supplied `<iframe>` (Google Maps embed, pin at 13°02'55.3"N 77°37'45.5"E). Only the URL is stored; the
+site renders its own iframe, and the setting only accepts `https://www.google.com/maps/embed?…` URLs.
+**Testing performed:** Live Contact page (Edge): one map iframe (589 × 442), pin beside Zudio on Thanisandra Main Road,
+**no CSP violations** (`frame-src` already allows https://www.google.com).
+**Rollback:** clear *Map* in Admin → Site settings.
+
+---
+
 ### CHG-0024 — Guest emails sent from reservations@thetycoonshotel.com
 - **Date:** 2026-11-11 · **Module:** Notifications / outgoing mail · **Change type:** Configuration, Enhancement
-- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** see `git log` · **Release:** REL-0014
+- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** `8485539` · **Release:** REL-0014
 
 **Reason:** Customers should receive mail from reservations@thetycoonshotel.com.
 **Previous behaviour:** All mail from `no-reply@devtycoonshotel.proteam.co.in` (CHG-0023), envelope sender chosen by the host.
@@ -836,6 +850,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0014 | 2026-11-11 | `tycoons-20261111T074402Z` | CHG-0024 (+ `.env` `MAIL_FROM`); CHG-0025 content | — | Ready 200; mailer with envelope sender on server; booking mode still `request`; map renders, no CSP violations |
 | REL-0013 | 2026-11-11 | `tycoons-20261111T072020Z` | CHG-0023 (+ `.env` mail settings, seed, request mode and recipient set) | — | TEST request emailed via sendmail to the recipient; declined afterwards; bundle matched |
 | REL-0012 | 2026-11-06 | `tycoons-20261106T072805Z` | CHG-0022 | — | Bundle matched; ready 200 |
 | REL-0011 | 2026-11-06 | `tycoons-20261106T063307Z` | CHG-0021 | — | Live CSS contains the fix; bundle matched; ready 200 |
