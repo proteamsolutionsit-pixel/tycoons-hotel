@@ -38,7 +38,7 @@ configuration, dependency and deployment changes. **Newest entries first.**
 | Development | Local Windows machine: MySQL 8.4 on :3308, API :8000, Vite :5173, `ENVIRONMENT=development`, `PAYMENT_MODE=mock` | In use |
 | Staging (test site) | `https://devtycoonshotel.proteam.co.in` — cPanel, CloudLinux Passenger, Python 3.10, MariaDB 10.11; `ENVIRONMENT=staging`, test payments (`PAYMENT_MODE=mock`) | In use; every "Deployed" status below refers to this environment |
 | SIT / UAT | — | Not provided |
-| Production | — | Not deployed. No live Razorpay keys configured |
+| Production (live) | `https://thetycoonshotel.com` — cPanel account `thetycoonshotel`, same server and stack as staging; `ENVIRONMENT=production`, booking requests by email (no online payment), mail from reservations@thetycoonshotel.com | Live since 2026-11-11 (REL-0017). No Razorpay keys configured |
 
 ### Related documents
 
@@ -68,6 +68,52 @@ configuration, dependency and deployment changes. **Newest entries first.**
 ---
 
 ## 3. Change history
+
+### CHG-0030 — Go-live: site installed on thetycoonshotel.com with staging content, no transaction data
+- **Date:** 2026-11-11 · **Module:** Hosting / deployment · **Change type:** Deployment, Configuration
+- **Environment:** Production · **Status:** Deployed (production) · **Related commit:** see `git log` · **Release:** REL-0017
+
+**Reason:** The hotel asked for the site to be moved from the development server to the live server, without
+transaction data.
+**Before:** `thetycoonshotel.com` had an empty web root (only a PHP-handler `.htaccess`), no Python app and no
+database. The hotel's mailboxes (reservations@, info@, sales@ ...) are on this account and were not touched.
+**What was done:**
+- New database `thetycoonshotel_tycoons` with two new accounts and freshly generated passwords (none reused from
+  staging; never displayed): schema owner (all privileges, used for migrations only) and application account
+  (SELECT, INSERT, UPDATE, DELETE).
+- Python 3.10 app registered with CloudLinux Python Selector (`~/tycoons`, URI `/`); release
+  `tycoons-20261111T094050Z.zip` (the build verified on staging in REL-0016); dependencies from `requirements-server.txt`.
+- Live `.env` (0600): `ENVIRONMENT=production`, hosts `thetycoonshotel.com` + `www`, `PUBLIC_BASE_URL=https://thetycoonshotel.com`,
+  secure cookies, database rate limiting, `SMTP_HOST=sendmail`, `MAIL_FROM` reservations@thetycoonshotel.com.
+- Schema built by the migrations (`migrate.py`, all 7 revisions to `4e8b1d6f2c30`; audit-log triggers created).
+- **Content copied from staging** (data only): roles 2, admin users 1 (admintycoon@proteam.co.in), room types 4,
+  site settings 27, content cards 8, gallery images 16, job openings 3, spa treatments 3, payment gateway setting 1
+  (mode `request`, no keys).
+- **Not copied (transaction and session data):** bookings (8 on staging), payments (5), payment events (656),
+  enquiries, table reservations, spa appointments, job applications, newsletter subscribers, admin sessions (36),
+  password-reset tokens, rate-limit buckets, audit log (105). All are empty on live.
+- Cron: housekeeping every 5 min, reconcile every 15 min. `.htaccess`: original kept as `.htaccess.pre-tycoons`;
+  added the HTTPS/www to `https://thetycoonshotel.com` 301 redirect (AutoSSL `/.well-known/` excluded) and the CSP block.
+- `scripts/cpanel.ps1`: `CP_TARGET=live` selects the live account (`cpanel-live.txt`, git-ignored); new
+  `Invoke-CpOnce` helper for one-off server commands.
+
+**Issue found during the work:** the one-off cron helper passed the cron line key under the wrong parameter
+name (`line` instead of `linekey`), so its lines were not removed and repeated every minute for about 15 minutes
+(live: app create, pip install, migrate/load; staging: the export). No effect on data: the export and load
+scripts and the content dump had already been deleted after their first run, so the repeats failed at once and
+`migrate.py` was a no-op; live table counts were checked afterwards. All leftover cron lines, logs and transfer
+directories were removed on both servers; the helper in `scripts/cpanel.ps1` is fixed and warns if a line remains.
+**Security impact:** see SEC-0018. **Database impact:** new production database (above). **API impact:** none.
+**Testing performed (live, after deploy):** `/api/v1/health/ready` 200 `{"status":"ok"}`; `http://`, `http://www`,
+`https://www` all 301 to `https://thetycoonshotel.com/...`; certificate Let's Encrypt `*.thetycoonshotel.com` +
+`thetycoonshotel.com`, valid to 2027-01-06; headers HSTS, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy, CSP;
+`/api/v1/docs` 404 (production); availability returns `booking_mode: "request"` as on staging; browser scan of all 8
+public pages: no placeholders; `/admin` 200; cPanel Email Deliverability for thetycoonshotel.com: SPF VALID, DKIM VALID.
+Not tested: a real booking request and its emails (it would create a transaction on live), left to the hotel.
+**Rollback:** remove the app in Setup Python App and restore `.htaccess.pre-tycoons`; the database and its accounts
+can be dropped in cPanel > MySQL Databases.
+
+---
 
 ### CHG-0029 — Site-wide: show only values filled in by the hotel; hide [placeholder] dummy values
 - **Date:** 2026-11-11 · **Module:** Public site (all pages), site settings and content display · **Change type:** Enhancement
@@ -789,6 +835,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Date | Area | Concern | Remediation | Evidence | Residual risk / limits | Ref | Status |
 |---|---|---|---|---|---|---|---|---|
+| SEC-0018 | 2026-11-11 | Production go-live | Live site must not inherit staging secrets, test payments or guest data; credentials must not leak | New DB accounts with generated passwords (written straight to a 0600 `.env`, never displayed); app account DML only; `ENVIRONMENT=production` (test payments refused, API docs off); only content tables copied, no bookings/payments/enquiries/sessions/audit rows; HTTPS only with HSTS + CSP; content dump and transfer scripts deleted from both servers and locally after use; `cpanel-live.txt` git-ignored | Live checks in CHG-0030; table counts after load | The copied admin account keeps its staging password (change it on live); live and staging share one server | OWASP A05 | Verified (production) |
 | SEC-0017 | 2026-11-11 | Booking requests / email | Public endpoint now sends email to the hotel and the guest — spam and mail-bombing risk; recipient list must not leak | Per-IP (10/10 min) and per-guest-email (5/h) limits; idempotent replays not re-emailed; recipients private and validated; sendmail via fixed path, no shell | `test_booking_requests.py` (replay, privacy, validation, transport) | A determined sender rotating IPs and addresses can still send some requests; CAPTCHA not added | OWASP A04 | Tested; deployed (staging) |
 | SEC-0016 | 2026-10-23 | Database hosting | Remote MySQL access to the staging DB from an external IP | Remote-access host removed in cPanel; DB users scoped to `localhost`; app account limited to DML | External login refused (checked 2026-10-23) | — | OWASP A05 | Verified (staging) |
 | SEC-0015 | 2026-10-26 | Repository | Third-party code (virtualenv) in history; risk of secrets in history before publishing | Virtualenv removed from all commits; `.venv*/` ignored; full-history scan for 11 real secret values | Scan: none found | Remote not yet pushed; scan covers known secrets only | CWE-540 | Verified |
@@ -893,6 +940,8 @@ Values are never recorded here. Restart = touch `tmp/restart.txt` on cPanel (`Re
 
 | Key / item | Purpose | Environments | Restart? | Change |
 |---|---|---|---|---|
+| Live `.env` (`ENVIRONMENT=production`, `ALLOWED_HOSTS`, `PUBLIC_BASE_URL`, `CORS_ORIGINS`, `MAIL_FROM`, DB URLs) | Production configuration on thetycoonshotel.com | Production | Yes | CHG-0030 |
+| `CP_TARGET` (deploy shell only) | `live` selects the live cPanel account in `scripts/cpanel.ps1` | Deploy tooling | No | CHG-0030 |
 | `MAX_ROOMS_PER_BOOKING` | Cap rooms per online booking (default 4) | All | Yes | CHG-0017 |
 | `SETTINGS_ENCRYPTION_KEY` / `STORAGE_DIR/private/settings.key` | Encrypt admin-entered payment secrets | All | Yes (env) | CHG-0008 |
 | `ENVIRONMENT=staging` | Production safeguards with test payments | Staging | Yes | CHG-0005 |
@@ -939,6 +988,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0017 | 2026-11-11 | `tycoons-20261111T094050Z` (same build as REL-0016), **production** thetycoonshotel.com | CHG-0030 (first install) | Fresh schema, all 7 revisions to `4e8b1d6f2c30` | Ready 200; redirects 301; cert valid; headers + CSP; docs 404; booking mode request; 8 pages no placeholders; SPF/DKIM valid |
 | REL-0016 | 2026-11-11 | `tycoons-20261111T094050Z` | CHG-0029 | — | All 8 public pages scanned live after deploy: no placeholders on any page |
 | REL-0015 | 2026-11-11 | `tycoons-20261111T090158Z` | CHG-0028 | — | Live Contact page: no placeholders, Getting-here list hidden, map shown; bundle matched |
 | REL-0014 | 2026-11-11 | `tycoons-20261111T074402Z` | CHG-0024 (+ `.env` `MAIL_FROM`); CHG-0025 content | — | Ready 200; mailer with envelope sender on server; booking mode still `request`; map renders, no CSP violations |
@@ -967,7 +1017,9 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | Item | Detail | Owner |
 |---|---|---|
-| Mailbox reservations@thetycoonshotel.com (CHG-0027) | Booking requests are sent there; confirm the mailbox exists in the cPanel account that hosts thetycoonshotel.com | Hotel / IT |
+| Live: change the admin password | The live admin (admintycoon@proteam.co.in) has the same password as staging; change it on thetycoonshotel.com/admin | Hotel |
+| Live: test booking request | Send one booking request on the live site, check that both emails arrive (guest and reservations@), then decline it in the admin | Hotel |
+| Live backups | Set up a nightly backup of `thetycoonshotel_tycoons` (cPanel backups or a cron mysqldump) | IT / Hosting |
 | DNS for mail from devtycoonshotel.proteam.co.in (CHG-0026) | At the proteam.co.in DNS provider (OrderBox): TXT `devtycoonshotel.proteam.co.in` = `v=spf1 ip4:78.159.97.108 ~all`; TXT `default._domainkey.devtycoonshotel.proteam.co.in` = the DKIM value shown in cPanel → Email Deliverability; optional MX `devtycoonshotel.proteam.co.in` → `devtycoonshotel.proteam.co.in` (priority 0). Then cPanel → Email Deliverability should show both VALID | IT / domain owner |
 | Child pricing (CHG-0019) | Children do not change the occupancy rate (1 adult + 1 child pays the single rate). Confirm with the hotel; changing it is a one-line rule in `availability.quote` | Hotel |
 | Razorpay keys | Staging uses test payments; live/test keys to be entered in Admin > Payment gateway | Hotel |

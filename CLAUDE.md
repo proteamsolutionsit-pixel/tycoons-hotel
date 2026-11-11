@@ -18,7 +18,10 @@ configuration, API, dependencies, logging, deployment — gets an entry in [CHAN
 6. In the final reply: what changed, files modified, security implications, tests and results, that
    CHANGELOG.md was updated, outstanding risks.
 
-## Deploying to staging (devtycoonshotel.proteam.co.in)
+## Deploying to staging (devtycoonshotel.proteam.co.in) and live (thetycoonshotel.com)
+
+Staging first; live only after the release has been checked there and the user asks for it. Select the
+server with `$env:CP_TARGET = 'live'` (or `''` for staging) before dot-sourcing `scripts/cpanel.ps1`.
 
 See [docs/OPERATIONS.md](docs/OPERATIONS.md). Order: back up the database → run the migration (`migrate.py`)
 → upload the release (`scripts/build-release.ps1`) → restart → live check → remove temporary files and

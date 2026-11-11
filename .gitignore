@@ -30,3 +30,4 @@ backups/
 
 # Hosting credentials (cPanel API token)
 cpanel.txt
+cpanel-live.txt

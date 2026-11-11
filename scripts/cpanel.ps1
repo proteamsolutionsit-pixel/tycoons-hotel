@@ -1,6 +1,7 @@
 <#
-  cPanel API helpers for deploying to devtycoonshotel.proteam.co.in (no SSH needed).
-  Dot-source it:   . .\scripts\cpanel.ps1
+  cPanel API helpers for deploying (no SSH needed).
+  Staging (devtycoonshotel.proteam.co.in):  $env:CP_TARGET = '';     . .\scripts\cpanel.ps1
+  Live (thetycoonshotel.com):               $env:CP_TARGET = 'live'; . .\scripts\cpanel.ps1   (uses cpanel-live.txt)
   Credentials: cpanel.txt in the project root (git-ignored), two lines:
       username- <cpanel user>
       token- <API token>      (cPanel > Security > Manage API Tokens; revoke when no longer needed)
@@ -12,14 +13,16 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Net.Http
 
 $root = Split-Path -Parent $PSScriptRoot
-$cred = Get-Content (Join-Path $root 'cpanel.txt')
+# Target: development (default) or live.  $env:CP_TARGET = 'live'; . .\scripts\cpanel.ps1
+$script:CpTarget = if ($env:CP_TARGET -eq 'live') { 'live' } else { 'dev' }
+$cred = Get-Content (Join-Path $root $(if ($script:CpTarget -eq 'live') { 'cpanel-live.txt' } else { 'cpanel.txt' }))
 $script:CpUser = ($cred[0] -replace '^[^-:=]+[-:=]\s*', '').Trim()
 $script:CpToken = ($cred[1] -replace '^[^-:=]+[-:=]\s*', '').Trim()
-$script:CpDomain = 'devtycoonshotel.proteam.co.in'
+$script:CpDomain = if ($script:CpTarget -eq 'live') { 'thetycoonshotel.com' } else { 'devtycoonshotel.proteam.co.in' }
 # cPanel answers on the server's shared hostname certificate; pin to the server
 # IP and accept that certificate for :2083 only (the site itself uses AutoSSL).
 $script:CpHost = '78.159.97.108'
-$script:CpHome = "/home3/$($script:CpUser)"
+$script:CpHome = if ($env:CP_HOME) { $env:CP_HOME } elseif ($script:CpTarget -eq 'live') { "/home2/$($script:CpUser)" } else { "/home3/$($script:CpUser)" }
 
 # A compiled callback: PowerShell scriptblocks cannot run on HttpClient's network
 # thread in Windows PowerShell 5.1. Accepts the certificate only for the cPanel host.
@@ -129,4 +132,34 @@ function Get-CpDirectory([string]$dir) {
 # Passenger restarts the app when tmp/restart.txt changes
 function Restart-CpPythonApp([string]$appRoot) {
   Set-CpFileContent "$appRoot/tmp" 'restart.txt' ([DateTime]::UtcNow.ToString('o'))
+}
+
+# Run a shell command once on the server through cron (there is no SSH), wait for it, and remove the
+# cron line again. Returns the exit code and output. Polls every 40 s to keep API calls few.
+#   $r = Invoke-CpOnce "cd ~/tycoons && ~/virtualenv/tycoons/3.10/bin/python migrate.py" 'migrate' 10
+function Invoke-CpOnce([string]$cmd, [string]$tag, [int]$maxMinutes = 8) {
+  $h = $script:CpHome
+  $marker = "cron-$tag.done"
+  $log = "$h/tmp/cron-$tag.log"
+  $full = "( $cmd ) > $log 2>&1; echo `$? > $h/tmp/$marker"
+  Invoke-Api2 Cron add_line @{ command = $full; minute = '*'; hour = '*'; day = '*'; month = '*'; weekday = '*' } | Out-Null
+  $deadline = (Get-Date).AddMinutes($maxMinutes)
+  $done = $false
+  try {
+    while ((Get-Date) -lt $deadline) {
+      Start-Sleep -Seconds 40
+      if (Get-CpDirectory "$h/tmp" | Where-Object { $_.file -eq $marker }) { $done = $true; break }
+    }
+  } finally {
+    # API2 Cron::remove_line needs "linekey"; passing the key as "line" silently removes nothing
+    foreach ($l in (Invoke-Api2 Cron listcron | Where-Object { $_.command -like "*$marker*" })) {
+      Invoke-Api2 Cron remove_line @{ linekey = $l.linekey } | Out-Null
+    }
+    if (Invoke-Api2 Cron listcron | Where-Object { $_.command -like "*$marker*" }) { Write-Warning "one-off cron line $tag is still installed - remove it" }
+  }
+  if (-not $done) { throw "cron job $tag did not finish within $maxMinutes min" }
+  $rc = (Get-CpFileContent "$h/tmp" $marker).Trim()
+  $out = Get-CpFileContent "$h/tmp" "cron-$tag.log"
+  Remove-CpPath "$h/tmp/$marker"; Remove-CpPath $log
+  [pscustomobject]@{ ExitCode = $rc; Output = $out }
 }

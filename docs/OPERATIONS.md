@@ -54,6 +54,27 @@
 | built-in housekeeper | every minute, per instance | expires lapsed holds, purges old rate-limit rows (idempotent across instances) |
 | backups | nightly | see above |
 
+## Live site (thetycoonshotel.com)
+
+| | Staging | Live |
+|---|---|---|
+| URL | https://devtycoonshotel.proteam.co.in | https://thetycoonshotel.com (http and www redirect here, 301) |
+| cPanel account / home | `devtycoonshotelp` · `/home3/devtycoonshotelp` | `thetycoonshotel` · `/home2/thetycoonshotel` |
+| Credentials file (git-ignored) | `cpanel.txt` | `cpanel-live.txt` |
+| Select with | `$env:CP_TARGET = ''` | `$env:CP_TARGET = 'live'` |
+| `ENVIRONMENT` | `staging` | `production` (test payments refused; `PAYMENT_MODE=razorpay`, booking-request mode set in the admin) |
+| Database | `devtycoonshotelp_tycoons` | `thetycoonshotel_tycoons` (owner `thetycoonshotel_owner`, app `thetycoonshotel_app` = DML only) |
+| Mail sender | no-reply@devtycoonshotel.proteam.co.in | reservations@thetycoonshotel.com (mailbox on the same account; SPF and DKIM valid) |
+
+Both run on the same server (78.159.97.108), Python 3.10, app root `~/tycoons`, storage `~/tycoons_storage`,
+the same two cron jobs (housekeeping every 5 min, reconcile every 15 min) and the same CSP block in
+`~/public_html/.htaccess`; live also has the HTTPS/www redirect block. The live `.htaccess` as it was before
+the app was installed is kept as `~/public_html/.htaccess.pre-tycoons`.
+
+Deploy to live = the staging procedure with `CP_TARGET=live`, after the same release has been checked on staging:
+back up the live database, run `migrate.py` (with `Invoke-CpOnce`), upload and extract the release, restart, check.
+Live holds real guest data: never copy the live database to staging or a laptop without the hotel's agreement.
+
 ## cPanel hosting (devtycoonshotel.proteam.co.in)
 
 - CloudLinux Python Selector + Passenger, Python 3.10, app root `~/tycoons`, served through `passenger_wsgi.py` (a2wsgi).
