@@ -71,7 +71,7 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ### CHG-0028 — Contact page hides contact details that are still placeholders
 - **Date:** 2026-11-11 · **Module:** Public site — Contact page · **Change type:** Enhancement
-- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** see `git log` · **Release:** REL-0015
+- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** `7db48d1` · **Release:** REL-0015
 
 **Reason:** The hotel asked to hide "Fishy Tales [+91 Phone]", "Kai Wellness Spa [+91 Phone]" and the Getting-here
 rows (airport, railway/metro, parking), which still showed design placeholders.
@@ -900,6 +900,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0015 | 2026-11-11 | `tycoons-20261111T090158Z` | CHG-0028 | — | Live Contact page: no placeholders, Getting-here list hidden, map shown; bundle matched |
 | REL-0014 | 2026-11-11 | `tycoons-20261111T074402Z` | CHG-0024 (+ `.env` `MAIL_FROM`); CHG-0025 content | — | Ready 200; mailer with envelope sender on server; booking mode still `request`; map renders, no CSP violations |
 | REL-0013 | 2026-11-11 | `tycoons-20261111T072020Z` | CHG-0023 (+ `.env` mail settings, seed, request mode and recipient set) | — | TEST request emailed via sendmail to the recipient; declined afterwards; bundle matched |
 | REL-0012 | 2026-11-06 | `tycoons-20261106T072805Z` | CHG-0022 | — | Bundle matched; ready 200 |
