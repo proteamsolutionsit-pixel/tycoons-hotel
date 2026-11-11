@@ -5,6 +5,7 @@ import { useSite } from '../context/SiteContext';
 import { useApi } from '../hooks/useApi';
 import { usePageMotion } from '../motion/usePageMotion';
 import { siteApi } from '../services/api';
+import { withoutPlaceholders } from '../utils/format';
 
 export default function Wellness() {
   const { settings, loading: siteLoading } = useSite();
@@ -43,9 +44,10 @@ export default function Wellness() {
           <StateMessage loading={treatments.loading} error={treatments.error} onRetry={treatments.reload}
             empty={treatments.data && !treatments.data.length ? 'Our therapy menu is being updated. Please contact the spa.' : null} />
           {treatments.data && treatments.data.length > 0 && (
-            <CardGrid cards={treatments.data} render={(t) => (
-              <p className="card__meta">{[t.duration_label, t.price_label].filter(Boolean).join(' · ')}</p>
-            )} />
+            <CardGrid cards={treatments.data} render={(t) => {
+              const meta = [t.duration_label, t.price_label].map(withoutPlaceholders).filter((m) => m && m !== 'From').join(' · ');
+              return meta ? <p className="card__meta">{meta}</p> : null;
+            }} />
           )}
         </div>
       </section>

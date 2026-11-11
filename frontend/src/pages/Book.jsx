@@ -12,7 +12,7 @@ import { useSite } from '../context/SiteContext';
 import { usePageMotion } from '../motion/usePageMotion';
 import { ApiError, siteApi } from '../services/api';
 import { openCheckout } from '../services/razorpay';
-import { guestsLabel, longDate, plural, rateBreakdown, rupees, tariffLine, timeOnly, uuid } from '../utils/format';
+import { guestsLabel, isFilled, longDate, plural, rateBreakdown, rupees, tariffLine, timeOnly, uuid } from '../utils/format';
 import { rememberBookingEmail } from './bookingSession';
 
 export default function Book() {
@@ -104,9 +104,11 @@ export default function Book() {
                       <p className="quote-rooms">{plural(r.room_count, 'room')} for your party of {guestsLabel(query.adults, query.children).toLowerCase()}</p>
                     )}
                     <p>{r.summary}</p>
-                    <ul className="quote-facts">
-                      {[r.size_label, r.bed_label, r.view_label, r.occupancy_label].filter(Boolean).map((f, i) => <li key={i}>{f}</li>)}
-                    </ul>
+                    {[r.size_label, r.bed_label, r.view_label, r.occupancy_label].some(isFilled) && (
+                      <ul className="quote-facts">
+                        {[r.size_label, r.bed_label, r.view_label, r.occupancy_label].filter(isFilled).map((f, i) => <li key={i}>{f}</li>)}
+                      </ul>
+                    )}
                     {tariffLine(r.nightly_rate_paise, r.single_rate_paise, r.inclusions) && (
                       <p className="quote-tariff">{tariffLine(r.nightly_rate_paise, r.single_rate_paise, r.inclusions)}</p>
                     )}

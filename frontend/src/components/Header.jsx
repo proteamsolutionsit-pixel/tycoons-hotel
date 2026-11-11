@@ -37,8 +37,8 @@ export default function Header({ onOpenMenu, menuOpen, menuButtonRef }) {
       <div className="utility wrap">
         <span className="utility__address" title={`${c.street}${c.street && c.city ? ', ' : ''}${c.city}`}>{c.street}{c.street && c.city ? ', ' : ''}{c.city}</span>
         <div className="utility__links">
-          <a className="u-draw" href={c.tel}>{c.phone}</a>
-          <a className="u-draw" href={c.mailto}>{c.email}</a>
+          {c.phone && <a className="u-draw" href={c.tel}>{c.phone}</a>}
+          {c.email && <a className="u-draw" href={c.mailto}>{c.email}</a>}
         </div>
       </div>
       <nav className="nav wrap" aria-label="Main">

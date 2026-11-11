@@ -5,6 +5,7 @@ import { useSite } from '../context/SiteContext';
 import { useApi } from '../hooks/useApi';
 import { usePageMotion } from '../motion/usePageMotion';
 import { siteApi } from '../services/api';
+import { withoutPlaceholders } from '../utils/format';
 
 export default function Careers() {
   const { settings, loading: siteLoading } = useSite();
@@ -12,6 +13,8 @@ export default function Careers() {
   const openings = useApi(siteApi.openings, []);
   usePageMotion(!teams.loading && !openings.loading && !siteLoading);
 
+  // Openings still holding placeholder titles (e.g. "[Role title]") are not listed
+  const liveOpenings = (openings.data || []).filter((o) => withoutPlaceholders(o.title));
   return (
     <>
       {/* Swap for a team photo when available (e.g. /assets/img/careers.jpg). */}
@@ -49,10 +52,15 @@ export default function Careers() {
           <StateMessage loading={openings.loading} error={openings.error} onRetry={openings.reload} />
           {openings.data && (
             <ul className="roles" data-reveal-children="">
-              {openings.data.length === 0 && <li className="roles__empty">There are no open positions right now.</li>}
-              {openings.data.map((o) => (
+              {liveOpenings.length === 0 && <li className="roles__empty">There are no open positions right now.</li>}
+              {liveOpenings.map((o) => (
                 <li key={o.id}>
-                  <div><h3>{o.title}</h3><p>{o.department} · {o.employment_type}</p></div>
+                  <div>
+                    <h3>{o.title}</h3>
+                    {[o.department, o.employment_type].map(withoutPlaceholders).some(Boolean) && (
+                      <p>{[o.department, o.employment_type].map(withoutPlaceholders).filter(Boolean).join(' · ')}</p>
+                    )}
+                  </div>
                   <Link className="link" to="/careers#apply" state={{ position: o.title, openingId: o.id }}>Apply</Link>
                 </li>
               ))}
@@ -68,9 +76,11 @@ export default function Careers() {
             <p className="kicker">Apply</p>
             <h2 id="apply-title">Send your application</h2>
             <p className="intro__body">Share a few details and our team will be in touch.</p>
-            <dl className="contact-list">
-              <div><dt>Careers</dt><dd>{settings.careers_email_display}</dd></div>
-            </dl>
+            {settings.careers_email_display && (
+              <dl className="contact-list">
+                <div><dt>Careers</dt><dd>{settings.careers_email_display}</dd></div>
+              </dl>
+            )}
           </div>
           <ApplicationForm />
         </div>

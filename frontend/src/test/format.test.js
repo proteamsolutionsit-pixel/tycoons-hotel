@@ -1,4 +1,4 @@
-import { addDays, guestsLabel, hotelToday, longDate, nightsBetween, isFilled, rateBreakdown, rupees, stayRange, tariffLine } from '../utils/format';
+import { addDays, guestsLabel, hotelToday, longDate, nightsBetween, isFilled, rateBreakdown, rupees, stayRange, tariffLine, withoutPlaceholders } from '../utils/format';
 
 describe('format helpers', () => {
   it('formats paise as rupees', () => {
@@ -56,5 +56,29 @@ describe('isFilled', () => {
     expect(isFilled(null)).toBe(false);
     expect(isFilled('+91 80 4123 4567')).toBe(true);
     expect(isFilled('12 km · 40 min [approx]')).toBe(true);
+    expect(isFilled('[560077]')).toBe(true);           // a real number typed in brackets
+  });
+});
+
+describe('placeholders in site settings', () => {
+  it('removes placeholder text and drops placeholder-only items', async () => {
+    const { cleanSettings } = await import('../context/SiteContext');
+    expect(withoutPlaceholders('Karnataka [PIN]')).toBe('Karnataka');
+    expect(withoutPlaceholders('[+91 Phone]')).toBe('');
+    expect(withoutPlaceholders('From [PRICE]')).toBe('From');
+    expect(withoutPlaceholders('Karnataka [560077]')).toBe('Karnataka 560077');
+    const s = cleanSettings({
+      address_region_pin: 'Karnataka [PIN]', dining_phone_display: '[+91 Phone]', phone_display: '+91 9364789448',
+      amenities: ['Fishy Tales', '[Wi-Fi]'],
+      stay_details: [{ label: 'Check-in', value: '[TIME]' }, { label: 'Check-out', value: '11:00 am' }],
+      map_embed_url: 'https://www.google.com/maps/embed?pb=[x]', room_tax_percent: 0,
+    });
+    expect(s.address_region_pin).toBe('Karnataka');
+    expect(s.dining_phone_display).toBe('');
+    expect(s.phone_display).toBe('+91 9364789448');
+    expect(s.amenities).toEqual(['Fishy Tales']);
+    expect(s.stay_details).toEqual([{ label: 'Check-out', value: '11:00 am' }]);
+    expect(s.map_embed_url).toBe('https://www.google.com/maps/embed?pb=[x]');   // links untouched
+    expect(s.room_tax_percent).toBe(0);
   });
 });

@@ -120,6 +120,17 @@ export function rateBreakdown({ rate, singleRate, singles = 0, rooms = 1, nights
 /** A content value the hotel has actually filled in: not empty and not a design
     placeholder such as "[+91 Phone]" or "[Distance · drive time]". */
 export function isFilled(value) {
-  const v = String(value ?? '').trim();
-  return v !== '' && !/^\[[^\]]*\]$/.test(v);
+  return withoutPlaceholders(value) !== '';
+}
+
+/** Text with design placeholders removed: "Karnataka [PIN]" -> "Karnataka",
+    "[+91 Phone]" -> "". A bracket holding only numbers is a real value typed in
+    brackets and is kept without them: "Karnataka [560077]" -> "Karnataka 560077".
+    Leftover separators at the ends are trimmed. */
+export function withoutPlaceholders(text) {
+  return String(text ?? '')
+    .replace(/\[([^\]]*)\]/g, (_, inner) => (/[A-Za-z]/.test(inner) ? ' ' : ` ${inner} `))
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,·|–-]+|[\s,·|–-]+$/g, '')
+    .trim();
 }

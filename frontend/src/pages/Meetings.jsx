@@ -25,7 +25,7 @@ export default function Meetings() {
             <p className="kicker">For business travellers</p>
             <h2 id="work-title">Work well. Rest well.</h2>
             <p>The Tycoons Hotel is designed around the rhythm of a business trip — focused days, easy evenings and a quiet night's rest.</p>
-            <p>{settings.lounge_work_note}</p>
+            {settings.lounge_work_note && <p>{settings.lounge_work_note}</p>}
           </div>
         </div>
       </section>

@@ -1,6 +1,7 @@
 /* Building blocks shared by the inner pages. Markup and classes are the
    original's; content comes from props / the API. */
 import { SplitText } from './SplitText';
+import { withoutPlaceholders } from '../utils/format';
 
 export function PageHero({ image, alt, width, height, kicker, title, lede, booking = false }) {
   return (
@@ -18,6 +19,7 @@ export function PageHero({ image, alt, width, height, kicker, title, lede, booki
 }
 
 export function DetailsStrip({ items, label, className = 'section bg-alt' }) {
+  if (!items || !items.length) return null;   // nothing filled in: no empty strip
   return (
     <section className={className} aria-label={label}>
       <div className="wrap">
@@ -49,16 +51,21 @@ export function StateMessage({ loading, error, empty, onRetry, children }) {
 export function CardGrid({ cards, two = false, render }) {
   return (
     <ul className={'cards' + (two ? ' cards--two' : '')} data-stagger="">
-      {cards.map((c) => (
-        <li className="card" key={c.id}>
-          <span className="card__media zoom"><img src={c.image_url} alt={c.image_alt} loading="lazy" /></span>
-          <div className="card__body">
-            <h3>{c.title ?? c.name}</h3>
-            <p>{c.body ?? c.description}</p>
-            {render ? render(c) : c.meta ? <p className="card__meta">{c.meta}</p> : null}
-          </div>
-        </li>
-      ))}
+      {cards.map((c) => {
+        // Content from the admin masters: [placeholders] are not shown
+        const body = withoutPlaceholders(c.body ?? c.description);
+        const meta = withoutPlaceholders(c.meta);
+        return (
+          <li className="card" key={c.id}>
+            <span className="card__media zoom"><img src={c.image_url} alt={c.image_alt} loading="lazy" /></span>
+            <div className="card__body">
+              <h3>{withoutPlaceholders(c.title ?? c.name)}</h3>
+              {body && <p>{body}</p>}
+              {render ? render(c) : meta ? <p className="card__meta">{meta}</p> : null}
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }

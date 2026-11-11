@@ -5,7 +5,7 @@ import { useSite } from '../context/SiteContext';
 import { useApi } from '../hooks/useApi';
 import { usePageMotion } from '../motion/usePageMotion';
 import { siteApi } from '../services/api';
-import { rupees, tariffLine } from '../utils/format';
+import { isFilled, rupees, tariffLine } from '../utils/format';
 
 export default function Rooms() {
   const { settings, loading: siteLoading } = useSite();
@@ -40,12 +40,12 @@ export default function Rooms() {
             <div className="stack" data-reveal="">
               <h2 id={`room-${r.slug}`}>{r.name}</h2>
               <p>{r.description}</p>
-              <ul className="facts">
-                <li>{r.size_label}</li>
-                <li>{r.bed_label}</li>
-                <li>{r.view_label}</li>
-                <li>{r.occupancy_label}</li>
-              </ul>
+              {/* Only facts entered in Rooms & rates; [placeholders] are not shown */}
+              {[r.size_label, r.bed_label, r.view_label, r.occupancy_label].some(isFilled) && (
+                <ul className="facts">
+                  {[r.size_label, r.bed_label, r.view_label, r.occupancy_label].filter(isFilled).map((f, i) => <li key={i}>{f}</li>)}
+                </ul>
+              )}
               <div className="price-row">
                 <Link className="btn" to={`/rooms?room=${encodeURIComponent(r.slug)}#book`}>Check Availability</Link>
                 {(r.single_rate_paise != null || r.inclusions) && (

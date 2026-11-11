@@ -58,8 +58,8 @@ export default function MobileMenu({ open, onClose, returnFocusRef }) {
       </ul>
       <div className="menu__foot">
         <span>{c.street}{c.street && c.city ? ', ' : ''}{c.city}</span>
-        <a href={c.tel}>{c.phone}</a>
-        <a href={c.mailto}>{c.email}</a>
+        {c.phone && <a href={c.tel}>{c.phone}</a>}
+        {c.email && <a href={c.mailto}>{c.email}</a>}
         <Link className="btn btn--gold" to="/rooms#book" onClick={onClose}>Check Rates</Link>
       </div>
     </div>

@@ -26,13 +26,15 @@ export default function Footer() {
           </nav>
           <div>
             <h2>Contact</h2>
-            <address>{c.street}<br />{c.city}{c.city && c.regionPin ? ', ' : ''}{c.regionPin}</address>
+            {(c.street || c.city || c.regionPin) && (
+              <address>{c.street}{c.street && <br />}{c.city}{c.city && c.regionPin ? ', ' : ''}{c.regionPin}</address>
+            )}
             <ul>
-              <li><a className="u-draw" href={c.tel}>{c.phone}</a></li>
+              {c.phone && <li><a className="u-draw" href={c.tel}>{c.phone}</a></li>}
               {c.landlines.map((l, i) => (
                 <li key={i}><a className="u-draw" href={l.tel}>{l.label ? `${l.label} · ` : ''}{l.number}</a></li>
               ))}
-              <li><a className="u-draw" href={c.mailto}>{c.email}</a></li>
+              {c.email && <li><a className="u-draw" href={c.mailto}>{c.email}</a></li>}
             </ul>
           </div>
           <div>

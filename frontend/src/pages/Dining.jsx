@@ -40,9 +40,7 @@ export default function Dining() {
               <p className="kicker">On the menu</p>
               <h2 id="menu-title">Three ways to dine</h2>
             </div>
-            {menuPdf
-              ? <a className="link" href={menuPdf} target="_blank" rel="noopener noreferrer">Download menu</a>
-              : <Link className="link" to="/dining#reserve">Download menu [PDF]</Link>}
+            {menuPdf && <a className="link" href={menuPdf} target="_blank" rel="noopener noreferrer">Download menu</a>}
           </div>
           <StateMessage loading={cards.loading} error={cards.error} onRetry={cards.reload} />
           {cards.data && <CardGrid cards={cards.data} />}

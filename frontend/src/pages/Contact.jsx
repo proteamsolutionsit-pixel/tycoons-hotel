@@ -24,8 +24,10 @@ export default function Contact() {
             <p className="kicker">Get in touch</p>
             <h2 id="touch-title">The Tycoons Hotel</h2>
             <dl className="contact-list">
-              <div><dt>Address</dt><dd>{c.street}<br />{c.city}{c.city && c.regionPin ? ', ' : ''}{c.regionPin}</dd></div>
-              <div><dt>Reservations</dt><dd>{c.phone} · {c.email}</dd></div>
+              {(c.street || c.city || c.regionPin) && (
+                <div><dt>Address</dt><dd>{c.street}{c.street && <br />}{c.city}{c.city && c.regionPin ? ', ' : ''}{c.regionPin}</dd></div>
+              )}
+              {(c.phone || c.email) && <div><dt>Reservations</dt><dd>{[c.phone, c.email].filter(Boolean).join(' · ')}</dd></div>}
               {c.landlines.map((l, i) => (
                 <div key={i}><dt>{l.label || 'Landline'}</dt><dd>{l.tel ? <a className="u-draw" href={l.tel}>{l.number}</a> : l.number}</dd></div>
               ))}

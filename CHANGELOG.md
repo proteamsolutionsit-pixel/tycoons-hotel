@@ -69,6 +69,45 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0029 — Site-wide: show only values filled in by the hotel; hide [placeholder] dummy values
+- **Date:** 2026-11-11 · **Module:** Public site (all pages), site settings and content display · **Change type:** Enhancement
+- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** see `git log` · **Release:** REL-0016
+- **Extends:** CHG-0028 (Contact page only)
+
+**Reason:** The hotel asked that dummy values such as "[Room size · sq ft]" not be shown anywhere: a value should appear
+only when it has been entered in Site settings or the admin masters.
+**Previous behaviour:** Seeded design placeholders were displayed (scan of the live site before the change):
+footer/Contact "Karnataka [560077]"; Rooms "[Room size · sq ft]", "[Bed type]", "[View]", "[Max occupancy]";
+Dining "[Signature dishes]", "[Capacity · packages]", "Download menu [PDF]"; Wellness "[Duration]", "From [PRICE]";
+Meetings "[Capacity]", "[Hours]", "[Packages]"; Careers "[Role title]", "[Department]", "[Full-time / Part-time]".
+**New behaviour:**
+- Rule (`withoutPlaceholders` / `isFilled` in `utils/format.js`): bracketed text containing letters is a design
+  placeholder and is removed; bracketed digits are a real value typed in brackets and kept without them
+  ("Karnataka [560077]" → "Karnataka 560077"); a value left empty after that is "not filled".
+- **Site settings** are cleaned once, centrally, when the site loads them (`cleanSettings` in `SiteContext`):
+  placeholder text removed, placeholder-only list items and label/value rows dropped; links and machine values
+  (`*_url`, `phone_tel`, `reservations_email`, tax, terms version) are left untouched.
+- Every consumer hides itself when empty: header strip and mobile menu (phone, email), footer (address, phone,
+  email), Contact (address, reservations), Careers (careers email), Meetings (lounge note), Home (amenities ticker,
+  lounge facts), all details strips (stay / restaurant / spa).
+- **Masters:** room facts (Rooms, booking page); content cards (title, body, meta); spa treatment duration/price;
+  job openings (openings whose title is a placeholder are not listed; department/type shown only if filled).
+- Dining "Download menu" link shown only when a menu PDF is set.
+Nothing is deleted: entering a real value in the admin makes it appear.
+**Files modified:** `frontend/src/utils/format.js`, `frontend/src/context/SiteContext.jsx`, `frontend/src/components/Header.jsx`,
+`frontend/src/components/MobileMenu.jsx`, `frontend/src/components/Footer.jsx`, `frontend/src/components/Sections.jsx`,
+`frontend/src/pages/Rooms.jsx`, `frontend/src/pages/Book.jsx`, `frontend/src/pages/Contact.jsx`, `frontend/src/pages/Careers.jsx`,
+`frontend/src/pages/Meetings.jsx`, `frontend/src/pages/Home.jsx`, `frontend/src/pages/Wellness.jsx`, `frontend/src/pages/Dining.jsx`,
+`frontend/src/test/format.test.js`, `CHANGELOG.md`
+**Security / database / API / configuration impact:** None (display only; stored values unchanged).
+**Testing performed:** Frontend **33 passed** (new: placeholder removal, bracketed-number rule, `cleanSettings`).
+Browser scan of all 8 public pages (local build with staging data): **no placeholders on any page** (before: placeholders
+on all 8). Spot checks: footer "Karnataka 560077"; Careers "There are no open positions right now." (all three seeded
+openings are placeholders); spa cards without the meta line; Dining cards with real text only.
+**Rollback:** redeploy the previous release.
+
+---
+
 ### CHG-0028 — Contact page hides contact details that are still placeholders
 - **Date:** 2026-11-11 · **Module:** Public site — Contact page · **Change type:** Enhancement
 - **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** `7db48d1` · **Release:** REL-0015

@@ -38,7 +38,7 @@ export default function Home() {
         </div>
       </section>
 
-      <Marquee items={settings.amenities || []} />
+      {(settings.amenities || []).length > 0 && <Marquee items={settings.amenities} />}
 
       {rooms.data ? <RoomsCarousel rooms={rooms.data} /> : (
         <section className="section bg-alt rooms" id="stay" aria-labelledby="rooms-title">
@@ -59,9 +59,11 @@ export default function Home() {
             <p className="kicker">Business Lounge</p>
             <SplitText as="h2" id="meetings-title" text="Built for the way you work." />
             <p>A business lounge and dependable connectivity, with a team that handles every detail of your stay.</p>
-            <ul className="facts">
-              {(settings.lounge_facts || []).map((t, i) => <li key={i}>{t}</li>)}
-            </ul>
+            {(settings.lounge_facts || []).length > 0 && (
+              <ul className="facts">
+                {settings.lounge_facts.map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+            )}
             <Link className="btn" to="/meetings">Explore the Lounge</Link>
           </div>
         </div>
