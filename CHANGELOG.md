@@ -69,6 +69,25 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0028 — Contact page hides contact details that are still placeholders
+- **Date:** 2026-11-11 · **Module:** Public site — Contact page · **Change type:** Enhancement
+- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** see `git log` · **Release:** REL-0015
+
+**Reason:** The hotel asked to hide "Fishy Tales [+91 Phone]", "Kai Wellness Spa [+91 Phone]" and the Getting-here
+rows (airport, railway/metro, parking), which still showed design placeholders.
+**Previous behaviour:** Those rows always rendered, placeholders included.
+**New behaviour:** New helper `isFilled()` (empty or a value that is entirely `[…]` = not filled). On the Contact page
+the Fishy Tales and Kai Wellness Spa rows and each Getting-here row appear only when filled in; the Getting-here
+list disappears when no row is filled. The map and the "In the heart of Bengaluru" heading stay. Entering a real
+value in Site settings brings a row back; nothing is deleted.
+**Files modified:** `frontend/src/utils/format.js`, `frontend/src/pages/Contact.jsx`, `frontend/src/test/format.test.js`, `CHANGELOG.md`
+**Security / database / API / configuration impact:** None.
+**Testing performed:** Frontend **32 passed** (new `isFilled` test). Browser (Edge, local, with staging's `GET /site`):
+contact list shows Address, Reservations and the landline only; Getting-here list absent; map present.
+**Rollback:** redeploy the previous release.
+
+---
+
 ### CHG-0027 — Booking requests now emailed to reservations@thetycoonshotel.com
 - **Date:** 2026-11-11 · **Module:** Site settings (content) · **Change type:** Configuration (data)
 - **Environment:** Staging · **Status:** Deployed (staging) · **Related commit:** none (setting change, no code)

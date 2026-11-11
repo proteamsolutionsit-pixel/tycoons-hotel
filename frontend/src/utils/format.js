@@ -116,3 +116,10 @@ export function rateBreakdown({ rate, singleRate, singles = 0, rooms = 1, nights
   if (hasSingle) lines.push(part(singleRate, rooms === 1 ? '(single occupancy)' : 'single', singles));
   return (lines.length > 1 ? `(${lines.join(' + ')})` : lines[0]) + nightsText;
 }
+
+/** A content value the hotel has actually filled in: not empty and not a design
+    placeholder such as "[+91 Phone]" or "[Distance · drive time]". */
+export function isFilled(value) {
+  const v = String(value ?? '').trim();
+  return v !== '' && !/^\[[^\]]*\]$/.test(v);
+}

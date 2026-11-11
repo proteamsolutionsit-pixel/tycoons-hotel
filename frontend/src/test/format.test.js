@@ -1,4 +1,4 @@
-import { addDays, guestsLabel, hotelToday, longDate, nightsBetween, rateBreakdown, rupees, stayRange, tariffLine } from '../utils/format';
+import { addDays, guestsLabel, hotelToday, longDate, nightsBetween, isFilled, rateBreakdown, rupees, stayRange, tariffLine } from '../utils/format';
 
 describe('format helpers', () => {
   it('formats paise as rupees', () => {
@@ -45,5 +45,16 @@ describe('occupancy tariffs', () => {
     expect(rateBreakdown({ rate: 450000, singleRate: 350000, singles: 0, rooms: 1, nights: 2 })).toBe('₹4,500 (double occupancy) × 2 nights');
     expect(rateBreakdown({ rate: 450000, singleRate: 350000, singles: 1, rooms: 2, nights: 2 })).toBe('(₹4,500 double + ₹3,500 single) × 2 nights');
     expect(rateBreakdown({ rate: 650000, singleRate: null, rooms: 2, nights: 1 })).toBe('₹6,500 × 2 rooms × 1 night');
+  });
+});
+
+describe('isFilled', () => {
+  it('treats empty values and [placeholders] as not filled', () => {
+    expect(isFilled('[+91 Phone]')).toBe(false);
+    expect(isFilled('[Distance · drive time]')).toBe(false);
+    expect(isFilled('  ')).toBe(false);
+    expect(isFilled(null)).toBe(false);
+    expect(isFilled('+91 80 4123 4567')).toBe(true);
+    expect(isFilled('12 km · 40 min [approx]')).toBe(true);
   });
 });

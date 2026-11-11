@@ -2,6 +2,7 @@ import { ContactForm } from '../components/forms/SiteForms';
 import { PageHero } from '../components/Sections';
 import { useContact, useSite } from '../context/SiteContext';
 import { usePageMotion } from '../motion/usePageMotion';
+import { isFilled } from '../utils/format';
 
 const MAP_EMBED = /^https:\/\/(www\.)?google\.[a-z.]+\/maps\/embed\?/;
 
@@ -10,6 +11,7 @@ export default function Contact() {
   const c = useContact();
   usePageMotion(!loading);
   const mapUrl = MAP_EMBED.test(settings.map_embed_url || '') ? settings.map_embed_url : null;
+  const gettingHere = (settings.getting_here || []).filter((g) => isFilled(g.value));
 
   return (
     <>
@@ -27,8 +29,9 @@ export default function Contact() {
               {c.landlines.map((l, i) => (
                 <div key={i}><dt>{l.label || 'Landline'}</dt><dd>{l.tel ? <a className="u-draw" href={l.tel}>{l.number}</a> : l.number}</dd></div>
               ))}
-              <div><dt>Fishy Tales</dt><dd>{settings.dining_phone_display}</dd></div>
-              <div><dt>Kai Wellness Spa</dt><dd>{settings.spa_phone_display}</dd></div>
+              {/* Shown only once the hotel has filled them in (placeholders are hidden) */}
+              {isFilled(settings.dining_phone_display) && <div><dt>Fishy Tales</dt><dd>{settings.dining_phone_display}</dd></div>}
+              {isFilled(settings.spa_phone_display) && <div><dt>Kai Wellness Spa</dt><dd>{settings.spa_phone_display}</dd></div>}
             </dl>
           </div>
           <ContactForm />
@@ -47,9 +50,11 @@ export default function Contact() {
           <div className="stack" data-reveal="">
             <p className="kicker">Getting here</p>
             <h2 id="here-title">In the heart of Bengaluru</h2>
-            <dl className="contact-list">
-              {(settings.getting_here || []).map((g, i) => <div key={i}><dt>{g.label}</dt><dd>{g.value}</dd></div>)}
-            </dl>
+            {gettingHere.length > 0 && (
+              <dl className="contact-list">
+                {gettingHere.map((g, i) => <div key={i}><dt>{g.label}</dt><dd>{g.value}</dd></div>)}
+              </dl>
+            )}
           </div>
         </div>
       </section>
