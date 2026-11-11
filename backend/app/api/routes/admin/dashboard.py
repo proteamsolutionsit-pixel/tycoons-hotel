@@ -62,6 +62,7 @@ def dashboard(_: AdminUser = Depends(require(Permission.DASHBOARD_VIEW)), db: Se
 
     week = now - timedelta(days=7)
     alerts = {
+        "booking_requests": count(select(Booking.id).where(Booking.status == BookingStatus.REQUESTED)),
         "payment_review": count(select(Booking.id).where(Booking.status == BookingStatus.PAYMENT_REVIEW)),
         # money authorised but not captured for >30 min: reconcile
         "stuck_authorized": count(select(Payment.id).where(Payment.status == PaymentStatus.AUTHORIZED,

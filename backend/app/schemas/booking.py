@@ -53,6 +53,7 @@ class AvailabilityResult(BaseModel):
     adults: int
     children: int
     rooms: list[RoomQuote]
+    booking_mode: Literal["pay", "request"] = "pay"   # "request": send a booking request, no online payment
 
 
 class BookingCreate(StaySearch):

@@ -117,6 +117,8 @@ def gateway_for(cfg: GatewayConfig) -> PaymentGateway | None:
     """The gateway for a configuration: the mock one in test-payment mode (never
     in production), Razorpay when keys are set, otherwise None (payments off)."""
     s = get_settings()
+    if cfg.mode == "request":
+        return None                     # booking requests: no online payment at all
     if cfg.mode == "mock":
         if s.environment == "production":
             return None

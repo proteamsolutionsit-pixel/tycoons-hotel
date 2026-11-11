@@ -8,6 +8,7 @@ Booking
           │                       └──late capture, room gone──▶ payment_review
           └──cancel──▶ cancelled ──capture arrives anyway──▶ payment_review
     payment_review ──staff rehouse──▶ confirmed | ──refund/cancel──▶ cancelled
+    requested (booking-request mode, no payment) ──staff confirm──▶ confirmed | ──decline──▶ cancelled
 
 Payment
     created ─▶ authorized ─▶ captured ─▶ refund_pending ─▶ refunded
@@ -30,6 +31,7 @@ class IllegalTransition(RuntimeError):
 
 
 BOOKING_TRANSITIONS: dict[B, frozenset[B]] = {
+    B.REQUESTED: frozenset({B.CONFIRMED, B.CANCELLED}),
     B.PENDING_PAYMENT: frozenset({B.CONFIRMED, B.EXPIRED, B.CANCELLED, B.PAYMENT_REVIEW}),
     B.EXPIRED: frozenset({B.CONFIRMED, B.PAYMENT_REVIEW}),
     B.CONFIRMED: frozenset({B.CANCELLED}),

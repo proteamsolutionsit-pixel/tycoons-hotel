@@ -154,6 +154,8 @@ export default function Book() {
 
 function GuestDetails({ quote, stay, onBooked }) {
   const { settings } = useSite();
+  // "request": the hotel takes bookings as requests (emailed to reservations), no online payment
+  const requestMode = stay.booking_mode === 'request';
   const idempotencyKey = useRef(uuid());
   const [pending, setPending] = useState(null); // {booking, checkout} after a dismissed checkout
   const navigate = useNavigate();
@@ -210,6 +212,10 @@ function GuestDetails({ quote, stay, onBooked }) {
       if (err instanceof ApiError && err.code === 'sold_out') idempotencyKey.current = uuid();
       throw err;
     }
+    if (!created.checkout) {                     // booking request recorded and emailed; nothing to pay
+      onBooked(created.booking.reference, created.booking.guest_email);
+      return undefined;
+    }
     return pay(created);
   });
 
@@ -230,7 +236,11 @@ function GuestDetails({ quote, stay, onBooked }) {
         {settings.cancellation_policy && (
           <p className="hold-note"><strong>Cancellation policy.</strong> {settings.cancellation_policy}</p>
         )}
-        <p className="hold-note">Your room is held for 15 minutes once you continue to payment. Payments are processed securely by Razorpay; we never see or store your card details.</p>
+        {requestMode ? (
+          <p className="hold-note">No payment is taken now. Send your request and our reservations team will contact you by phone or email to confirm your booking.</p>
+        ) : (
+          <p className="hold-note">Your room is held for 15 minutes once you continue to payment. Payments are processed securely by Razorpay; we never see or store your card details.</p>
+        )}
       </div>
 
       <form className="form-panel" aria-labelledby="details-title" noValidate ref={f.formRef} onSubmit={submit}>
@@ -242,7 +252,9 @@ function GuestDetails({ quote, stay, onBooked }) {
         <Check form={f} name="accept_terms">I agree to the booking terms and the hotel’s cancellation policy.</Check>
         <FormStatus status={f.status} />
         <button className="btn" type="submit" disabled={f.submitting}>
-          {f.submitting ? 'Opening secure payment…' : pending ? 'Try payment again' : `Pay ${rupees(quote.total_paise)} securely`}
+          {requestMode
+            ? (f.submitting ? 'Sending request…' : 'Send booking request')
+            : (f.submitting ? 'Opening secure payment…' : pending ? 'Try payment again' : `Pay ${rupees(quote.total_paise)} securely`)}
         </button>
         {pending && (
           <button type="button" className="link" style={{ background: 'none', border: 0, gridColumn: '1 / -1', justifySelf: 'start' }}

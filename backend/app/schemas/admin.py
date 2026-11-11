@@ -510,8 +510,8 @@ class UploadOut(BaseModel):
 class PaymentSettingsOut(BaseModel):
     """What is in force. Secrets are never returned - only whether one is set."""
 
-    mode: Literal["mock", "razorpay"]
-    active: Literal["mock", "test", "live", "disabled"]
+    mode: Literal["mock", "razorpay", "request"]
+    active: Literal["mock", "test", "live", "disabled", "request"]
     source: Literal["admin", "environment"]
     key_id: str
     key_kind: Literal["test", "live"] | None
@@ -526,7 +526,7 @@ class PaymentSettingsOut(BaseModel):
 
 
 class PaymentSettingsUpdate(StrictInput):
-    mode: Literal["mock", "razorpay"]
+    mode: Literal["mock", "razorpay", "request"]
     key_id: str = Field(default="", max_length=64)
     # Blank keeps the stored secret
     key_secret: str | None = Field(default=None, max_length=128)

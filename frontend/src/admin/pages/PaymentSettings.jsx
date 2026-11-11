@@ -12,6 +12,7 @@ const STATUS = {
   mock: ['info', 'Test payments', 'No real money moves. Guests see a test payment window where they choose “success” or “failure”.'],
   test: ['good', 'Razorpay test mode', 'Payments go through Razorpay’s test environment. Use Razorpay’s test cards or UPI IDs; nobody is charged.'],
   live: ['warn', 'Razorpay LIVE', 'Guests are charged real money.'],
+  request: ['info', 'Booking requests by email', 'Guests send a booking request instead of paying online. Each request is emailed to the addresses in Site settings → Booking request emails, and staff confirm it under Bookings.'],
   disabled: ['error', 'Online payments are off', 'Guests can’t pay for bookings until a payment mode is set up below.'],
 };
 
@@ -48,7 +49,7 @@ export default function PaymentSettings() {
   const save = async (confirmLive = false) => {
     setBusy('save'); setNotice(null); setErrors({});
     try {
-      const body = form.mode === 'mock' ? { mode: 'mock' } : {
+      const body = form.mode !== 'razorpay' ? { mode: form.mode } : {
         mode: 'razorpay', key_id: form.key_id.trim(), key_secret: form.key_secret || null,
         webhook_secret: form.webhook_secret || null, confirm_live: confirmLive,
       };
@@ -116,6 +117,10 @@ export default function PaymentSettings() {
           <div className="adm-field adm-field--check">
             <input id="pg-mode-razorpay" type="radio" name="mode" value="razorpay" checked={form.mode === 'razorpay'} onChange={set('mode')} />
             <label htmlFor="pg-mode-razorpay">Razorpay (test or live keys)</label>
+          </div>
+          <div className="adm-field adm-field--check">
+            <input id="pg-mode-request" type="radio" name="mode" value="request" checked={form.mode === 'request'} onChange={set('mode')} />
+            <label htmlFor="pg-mode-request">Booking requests by email (no online payment)</label>
           </div>
           <div className="adm-field adm-field--check">
             <input id="pg-mode-mock" type="radio" name="mode" value="mock" checked={form.mode === 'mock'} onChange={set('mode')} disabled={!cfg.mock_allowed} />

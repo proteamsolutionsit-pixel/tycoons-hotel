@@ -30,7 +30,7 @@ _KIND_RE = re.compile(r"^rzp_(test|live)_")
 
 @dataclass(frozen=True)
 class GatewayConfig:
-    mode: str                 # "mock" | "razorpay"
+    mode: str                 # "mock" | "razorpay" | "request" (booking requests by email, no payment)
     key_id: str
     key_secret: str
     webhook_secret: str
@@ -72,7 +72,9 @@ def public_view(db: Session) -> dict[str, Any]:
     row = _row(db)
     by = db.get(AdminUser, row.updated_by_id) if row and row.updated_by_id else None
     mock_blocked = s.environment == "production"
-    if cfg.mode == "mock":
+    if cfg.mode == "request":
+        active = "request"
+    elif cfg.mode == "mock":
         active = "disabled" if mock_blocked else "mock"
     else:
         active = (key_kind(cfg.key_id) or "disabled") if cfg.key_secret else "disabled"
@@ -106,9 +108,10 @@ def update(db: Session, *, mode: str, key_id: str, key_secret: str | None, webho
     key_secret = (key_secret or "").strip() or None
     webhook_secret = (webhook_secret or "").strip() or None
 
-    if mode == "mock":
-        if s.environment == "production":
+    if mode in ("mock", "request"):
+        if mode == "mock" and s.environment == "production":
             _bad("mode", "Test payments are not allowed on the production site.")
+        # Razorpay keys are kept for switching back
         new_key_id, new_secret, new_webhook = current.key_id, current.key_secret, current.webhook_secret
     else:
         kind = key_kind(key_id)
@@ -186,3 +189,8 @@ def test_credentials(db: Session, *, key_id: str | None, key_secret: str | None)
             return False, "Razorpay rejected these keys. Check the Key Id and Key Secret."
         return False, "Could not reach Razorpay from the server. Try again in a minute."
     return True, f"Connected to Razorpay ({key_kind(key_id)} mode)."
+
+
+def booking_mode(db: Session) -> str:
+    """"request": guests send a booking request (emailed to the hotel) instead of paying online; else "pay"."""
+    return "request" if load(db).mode == "request" else "pay"

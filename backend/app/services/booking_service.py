@@ -33,7 +33,7 @@ from app.schemas.booking import (
     CheckoutPrefill,
     RoomQuote,
 )
-from app.services import availability
+from app.services import availability, payment_settings_service
 from app.services.razorpay_gateway import GatewayError, PaymentGateway
 
 log = logging.getLogger("app.booking")
@@ -90,7 +90,8 @@ def search(db: Session, check_in: date, check_out: date, adults: int, children: 
             tax_paise=q.tax_paise, total_paise=q.total_paise, currency=currency,
         ))
     return AvailabilityResult(check_in=check_in, check_out=check_out, nights=nights, adults=adults,
-                              children=children, rooms=quotes)
+                              children=children, rooms=quotes,
+                              booking_mode=payment_settings_service.booking_mode(db))  # type: ignore[arg-type]
 
 
 # -- Create ---------------------------------------------------------------
@@ -114,6 +115,38 @@ def create_booking(db: Session, data: BookingCreate, idempotency_key: str | None
                 raise Conflict("This checkout was already used for a different booking.", code="idempotency_mismatch")
             return existing, ensure_order(db, existing, gateway)
 
+    booking = _insert_booking(db, data, idempotency_key, BookingStatus.PENDING_PAYMENT)
+    if booking.status != BookingStatus.PENDING_PAYMENT:      # idempotent race returned another row
+        return booking, ensure_order(db, booking, gateway)
+    try:
+        payment = ensure_order(db, booking, gateway)
+    except UpstreamError:
+        # No order, so no way to pay: release the room immediately.
+        booking = booking_repo.lock(db, booking.id)
+        move_booking(booking, BookingStatus.CANCELLED)
+        booking.cancelled_at = utcnow()
+        booking.cancel_reason = "Payment order could not be created"
+        booking.hold_expires_at = None
+        db.commit()
+        raise
+    return booking, payment
+
+
+def create_request(db: Session, data: BookingCreate, idempotency_key: str | None) -> tuple[Booking, bool]:
+    """Booking-request mode: record the request (no payment, no room held).
+    Returns (booking, created) - created is False for an idempotent replay."""
+    if idempotency_key:
+        existing = booking_repo.get_by_idempotency_key(db, idempotency_key)
+        if existing is not None:
+            if not _same_request(existing, data):
+                raise Conflict("This request was already sent for a different booking.", code="idempotency_mismatch")
+            return existing, False
+    booking = _insert_booking(db, data, idempotency_key, BookingStatus.REQUESTED)
+    return booking, booking.status == BookingStatus.REQUESTED and booking.idempotency_key == idempotency_key
+
+
+def _insert_booking(db: Session, data: BookingCreate, idempotency_key: str | None, status: BookingStatus) -> Booking:
+    """Validate the stay and party, check rooms are free under the room-type lock, price it and insert it."""
     s = get_settings()
     nights = availability.validate_stay(data.check_in, data.check_out)
     now = utcnow()
@@ -160,7 +193,8 @@ def create_booking(db: Session, data: BookingCreate, idempotency_key: str | None
         inclusions=room.inclusions or None,
         subtotal_paise=q.subtotal_paise, tax_percent=q.tax_percent,
         tax_paise=q.tax_paise, total_paise=q.total_paise, currency=s.currency,
-        status=BookingStatus.PENDING_PAYMENT, hold_expires_at=now + timedelta(minutes=s.booking_hold_minutes),
+        status=status,
+        hold_expires_at=now + timedelta(minutes=s.booking_hold_minutes) if status == BookingStatus.PENDING_PAYMENT else None,
         # What the guest agreed to, as shown to them at booking time
         terms_version=str(settings_repo.get_value(db, "booking_terms_version", "") or "")[:32] or None,
         terms_accepted_at=now,
@@ -173,23 +207,34 @@ def create_booking(db: Session, data: BookingCreate, idempotency_key: str | None
         db.rollback()
         # Same idempotency key raced us, or (astronomically unlikely) a reference clash
         if idempotency_key and (existing := booking_repo.get_by_idempotency_key(db, idempotency_key)):
-            return existing, ensure_order(db, existing, gateway)
+            return existing
         raise Conflict("Please try again.", code="retry") from exc
     db.refresh(booking)
-    log.info("Booking held", extra={"booking": booking.reference, "room": room.slug, "total_paise": q.total_paise})
+    log.info("Booking held" if status == BookingStatus.PENDING_PAYMENT else "Booking requested",
+             extra={"booking": booking.reference, "room": room.slug, "total_paise": q.total_paise})
+    return booking
 
-    try:
-        payment = ensure_order(db, booking, gateway)
-    except UpstreamError:
-        # No order, so no way to pay: release the room immediately.
-        booking = booking_repo.lock(db, booking.id)
-        move_booking(booking, BookingStatus.CANCELLED)
-        booking.cancelled_at = utcnow()
-        booking.cancel_reason = "Payment order could not be created"
-        booking.hold_expires_at = None
-        db.commit()
-        raise
-    return booking, payment
+
+def confirm_request(db: Session, booking_id: int, note: str, actor, request) -> Booking:
+    """Staff accept a booking request: the rooms must still be free."""
+    from app.services import audit
+
+    booking = booking_repo.lock(db, booking_id)
+    if booking.status != BookingStatus.REQUESTED:
+        db.rollback()
+        raise Conflict("Only booking requests can be confirmed here.", code="not_requested")
+    room = db.execute(select(RoomType).where(RoomType.id == booking.room_type_id).with_for_update()).scalar_one()
+    if availability.available_rooms(db, room, booking.check_in, booking.check_out, utcnow(),
+                                    exclude_booking_id=booking.id) < booking.room_count:
+        db.rollback()
+        raise Conflict(f"Not enough {room.name} rooms are free for these dates any more.", code="sold_out")
+    move_booking(booking, BookingStatus.CONFIRMED)
+    booking.confirmed_at = utcnow()
+    audit.record(db, action="booking.confirm_request", actor=actor, resource_type="booking", resource_id=booking.id,
+                 details={"reference": booking.reference, "note": note}, request=request)
+    db.commit()
+    db.refresh(booking)
+    return booking
 
 
 def ensure_order(db: Session, booking: Booking, gateway: PaymentGateway) -> Payment:

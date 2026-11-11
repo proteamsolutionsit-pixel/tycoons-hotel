@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     max_image_bytes: int = 8 * 1024 * 1024
 
     # Mail (optional; without SMTP_HOST messages are only logged) -------------
-    smtp_host: str = ""
+    smtp_host: str = ""                 # "sendmail" = use the host's /usr/sbin/sendmail
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""

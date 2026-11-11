@@ -133,6 +133,9 @@ SETTINGS = [
     ("stay_details", [{"label": "Check-in", "value": "[TIME]"}, {"label": "Check-out", "value": "[TIME]"},
                       {"label": "Breakfast", "value": "[Included / add-on]"}, {"label": "Parking", "value": "[Details]"}],
      "Stay details strip (Rooms page)", "rooms", None),
+    ("booking_request_emails", "", "Booking request emails", "rooms",
+     "Who receives an email for every booking request (when Payment gateway is set to booking requests). "
+     "One or more addresses separated by commas."),
     ("room_tax_percent", 0, "Room tax (GST) %", "rooms",
      "Added to every online booking. Confirm the applicable GST slab with your accountant."),
     ("cancellation_policy", "[Cancellation policy]", "Cancellation policy (shown at checkout)", "rooms",

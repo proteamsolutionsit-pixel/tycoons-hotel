@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.core.rate_limit import enforce, rate_limit
 from app.db.session import get_db
+from app.repositories import settings as settings_repo
 from app.schemas.booking import AvailabilityResult, BookingCheckout, BookingCreate, BookingLookup, BookingPublic
-from app.services import booking_service
+from app.services import booking_service, notifications, payment_settings_service
 from app.services.razorpay_gateway import PaymentGateway, get_gateway
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
@@ -26,13 +27,21 @@ def availability(check_in: date, check_out: date, adults: int = Query(2, ge=1, l
 
 
 @router.post("", response_model=BookingCheckout, status_code=201,
-             summary="Hold a room and create the Razorpay order to pay for it")
-def create_booking(data: BookingCreate, request: Request,
+             summary="Hold a room and create the Razorpay order to pay for it - or, in booking-request mode, "
+                     "record a booking request and email it to the hotel (checkout is then null)")
+def create_booking(data: BookingCreate, request: Request, background: BackgroundTasks,
                    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=64),
                    db: Session = Depends(get_db), gateway: PaymentGateway | None = Depends(get_gateway)):
     enforce(request, "booking-create", 10, 600)
     if idempotency_key is not None and (len(idempotency_key) < 16 or not idempotency_key.replace("-", "").isalnum()):
         raise AppError("Invalid Idempotency-Key header.", code="invalid_idempotency_key")
+    if payment_settings_service.booking_mode(db) == "request":
+        # Each request emails the hotel, so cap requests per guest email too (not only per IP)
+        enforce(request, "booking-request-email", 5, 3600, extra_key=str(data.guest_email).lower(), per_ip=False)
+        booking, created = booking_service.create_request(db, data, idempotency_key)
+        if created:
+            notifications.booking_requested(background, booking, settings_repo.booking_request_recipients(db))
+        return BookingCheckout(booking=booking_service.to_public(booking), checkout=None)
     if gateway is None:
         raise AppError("Online payment is not available right now. Please contact reservations.",
                        code="payments_unavailable", status_code=503)

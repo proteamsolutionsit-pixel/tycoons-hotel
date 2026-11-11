@@ -413,7 +413,8 @@ def _captured_payment(booking: Booking) -> Payment | None:
 def cancel_booking(db: Session, booking_id: int, *, reason: str, refund: bool, confirm_refund_paise: int | None,
                    gateway: PaymentGateway | None, actor: AdminUser, request: Request | None = None) -> Booking:
     booking = booking_repo.lock(db, booking_id)
-    if booking.status not in (BookingStatus.PENDING_PAYMENT, BookingStatus.CONFIRMED, BookingStatus.PAYMENT_REVIEW):
+    if booking.status not in (BookingStatus.PENDING_PAYMENT, BookingStatus.CONFIRMED, BookingStatus.PAYMENT_REVIEW,
+                              BookingStatus.REQUESTED):
         db.rollback()
         raise Conflict("This booking is already closed.", code="already_closed")
     if any(p.status == PaymentStatus.REFUND_PENDING for p in booking.payments):

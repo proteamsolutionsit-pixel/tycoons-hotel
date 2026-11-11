@@ -69,6 +69,76 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0023 — Booking requests by email instead of online payment
+- **Date:** 2026-11-11 · **Version:** API 1.1.0 · **Module:** Booking, payment settings, notifications, admin
+- **Change type:** Feature, Configuration, API · **Environment:** Development · **Status:** Tested
+- **Related commit:** see `git log` · **Feature:** FEAT-0014 · **Security:** SEC-0017
+
+**Reason:** The hotel wants guests to send a booking request after entering their details, emailed to
+sudheesh.c@proteamsolutions.co.in, instead of paying online.
+
+**Previous behaviour:** After the guest details, "Pay ₹… securely" opened Razorpay (or the test payment window);
+the room was held 15 minutes and confirmed on payment.
+
+**New behaviour:**
+- Admin → Payment gateway has a third mode, **Booking requests by email (no online payment)**. Razorpay and test
+  modes are unchanged and remain selectable; stored Razorpay keys are kept.
+- In request mode the guest sees "No payment is taken now…" and **Send booking request**. The booking is saved
+  with the new status **requested** (no payment, no room held) and the guest lands on their booking page:
+  "Thank you, we have your request" with an *estimated* total.
+- An email with the full request (stay, rooms, rate, estimated total, guest name/email/phone, special requests,
+  admin link) goes to every address in the new site setting **Booking request emails** (falls back to
+  `HOTEL_NOTIFY_EMAIL`); the guest receives an acknowledgement.
+- Staff see a **New booking requests** dashboard alert and a *Requested* filter in Bookings; **Confirm booking**
+  re-checks that the rooms are free, confirms and emails the guest ("Amount payable at the hotel");
+  **Decline request** cancels it.
+- Outgoing mail can use the host's own MTA: `SMTP_HOST=sendmail` pipes messages to `/usr/sbin/sendmail -t -i`.
+
+**Files modified:** `backend/app/models/enums.py`, `backend/app/domain/states.py`, `backend/app/services/booking_service.py`,
+`backend/app/services/payment_settings_service.py`, `backend/app/services/razorpay_gateway.py`,
+`backend/app/services/notifications.py`, `backend/app/services/mailer.py`, `backend/app/services/settings_service.py`,
+`backend/app/services/payment_service.py`, `backend/app/repositories/settings.py`, `backend/app/seed.py`,
+`backend/app/core/config.py`, `backend/app/schemas/booking.py`, `backend/app/schemas/admin.py`,
+`backend/app/api/routes/bookings.py`, `backend/app/api/routes/admin/bookings.py`, `backend/app/api/routes/admin/dashboard.py`,
+`backend/tests/test_booking_requests.py` (new), `frontend/src/pages/Book.jsx`, `frontend/src/pages/BookingStatus.jsx`,
+`frontend/src/admin/pages/Bookings.jsx`, `frontend/src/admin/pages/Dashboard.jsx`, `frontend/src/admin/pages/PaymentSettings.jsx`,
+`frontend/src/admin/ui.jsx`, `CHANGELOG.md`
+
+**Security impact:** see SEC-0017. Requests trigger emails, so they are rate limited per IP (existing 10 per 10 min)
+**and** per guest email (5 per hour); replayed requests (same idempotency key) are not re-emailed. The recipient
+list is a private setting (never sent to the public site), validated as ≤ 5 email addresses, editable only with
+`settings.manage`. The `sendmail` call uses a fixed path, no shell, and passes the message on stdin.
+**Database impact:** No schema change — `bookings.status` is a VARCHAR without a value check, so `requested`
+needs no migration. One new `site_settings` row via `app.cli seed`.
+**API impact:** `GET /bookings/availability` gains `booking_mode` (`pay` | `request`); `POST /bookings` returns
+`checkout: null` and status `requested` in request mode; `PaymentSettings*.mode` accepts `request`; admin
+`POST /admin/bookings/{id}/confirm` also confirms requests; cancel accepts requested bookings; dashboard
+`alerts.booking_requests`. Additive.
+**Configuration impact:** `SMTP_HOST=sendmail` (new value) and `MAIL_FROM` on the server; site setting
+*Booking request emails*; payment mode *request* (admin).
+
+**Testing performed:**
+- Backend `test_booking_requests.py` (13): mode flag; default pay mode; request saved without payment and
+  emailed to the recipient and the guest with all details; holds no room; idempotent replay not re-emailed;
+  fallback recipient; staff confirm (guest email says payable at the hotel, audited); confirm refused when sold
+  out; decline; dashboard count; mode selectable; recipient validation and privacy; sendmail transport.
+  13 passed (an earlier run overlapped a full-suite run on the same test DB and failed on duplicate seed rows —
+  rerun alone, all passed). Full backend suite (clean run, MySQL 8.4): **407 passed**.
+- Frontend: **31 passed**.
+- Browser (Edge, local): admin switched to booking requests and saved a recipient; guest form showed the new note
+  and **Send booking request**; the guest page showed "Request received" and an estimated total; mails were
+  generated to the recipient and the guest (logged locally, no SMTP); dashboard alert shown; staff confirmed the
+  request and a confirmation mail was generated.
+- Server probe (2026-11-11): local MTA answers on port 25/587 and `/usr/sbin/sendmail` exists.
+
+**Deployment notes:** Release → restart; server `.env`: `SMTP_HOST=sendmail`, `MAIL_FROM` on the site's domain;
+`app.cli seed` (after backup); Admin → Site settings → *Booking request emails* = the hotel's address;
+Admin → Payment gateway → *Booking requests by email*.
+**Rollback plan:** Switch Payment gateway back to Razorpay/test payments (no deploy needed). Code rollback:
+redeploy the previous release; any `requested` bookings remain readable in the database.
+
+---
+
 ### CHG-0022 — Show each room's rate and "Included with the rate" wherever it is filled in
 - **Date:** 2026-11-06 · **Module:** Public site — Rooms page, homepage room carousel · **Change type:** Enhancement
 - **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** `3ac9895` · **Release:** REL-0012
@@ -581,6 +651,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Date | Area | Concern | Remediation | Evidence | Residual risk / limits | Ref | Status |
 |---|---|---|---|---|---|---|---|---|
+| SEC-0017 | 2026-11-11 | Booking requests / email | Public endpoint now sends email to the hotel and the guest — spam and mail-bombing risk; recipient list must not leak | Per-IP (10/10 min) and per-guest-email (5/h) limits; idempotent replays not re-emailed; recipients private and validated; sendmail via fixed path, no shell | `test_booking_requests.py` (replay, privacy, validation, transport) | A determined sender rotating IPs and addresses can still send some requests; CAPTCHA not added | OWASP A04 | Tested |
 | SEC-0016 | 2026-10-23 | Database hosting | Remote MySQL access to the staging DB from an external IP | Remote-access host removed in cPanel; DB users scoped to `localhost`; app account limited to DML | External login refused (checked 2026-10-23) | — | OWASP A05 | Verified (staging) |
 | SEC-0015 | 2026-10-26 | Repository | Third-party code (virtualenv) in history; risk of secrets in history before publishing | Virtualenv removed from all commits; `.venv*/` ignored; full-history scan for 11 real secret values | Scan: none found | Remote not yet pushed; scan covers known secrets only | CWE-540 | Verified |
 | SEC-0014 | 2026-10-26 | Staff accounts | Email change could be used to take over a higher-privileged account | Email editable only within the editor's own access; unique; audited | Tests: change, duplicate 409, HR user → admin email 403 | — | CWE-639, OWASP A01 | Verified; deployed |
@@ -623,6 +694,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Feature | Requirement | Behaviour | Change | Config needed | Tests | Release status |
 |---|---|---|---|---|---|---|---|
+| FEAT-0014 | Booking requests by email | Replace online payment with an emailed request | Requested status, emails to recipients and guest, staff confirm/decline | CHG-0023 | Mode in Payment gateway; recipients in Site settings; server mail | 13 backend, 31 frontend | Tested |
 | FEAT-0013 | Multiple landline numbers | Publish several landlines | Labelled numbers in footer and Contact page, tel: links | CHG-0020 | Enter numbers in Site settings | 394 backend, 31 frontend | Deployed (staging) |
 | FEAT-0012 | Occupancy-based rates + inclusions | Twin Room: single ₹3,500, double ₹4,500, breakfast included | Single rate for one-adult rooms; tariff and breakdown shown | CHG-0019 | Enter rates per room type in the admin | 389 backend, 30 frontend | Deployed (staging) |
 | FEAT-0011 | Multi-room bookings | Offer enough rooms when a party exceeds one room | Fewest rooms per type; one payment | CHG-0017 | `MAX_ROOMS_PER_BOOKING` (optional) | 384 backend, 28 frontend | Deployed (staging) |

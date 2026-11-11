@@ -13,6 +13,7 @@ import { dateTime, guestsLabel, longDate, plural, rateBreakdown, rupees, timeOnl
 import { recallBookingEmail, rememberBookingEmail } from './bookingSession';
 
 const COPY = {
+  requested: { pill: 'pending', label: 'Request received', title: 'Thank you, we have your request', body: 'Our reservations team will contact you shortly by phone or email to confirm your booking. No payment has been taken.' },
   confirmed: { pill: 'confirmed', label: 'Confirmed', title: 'Your stay is confirmed', body: 'A confirmation has been sent to your email. We look forward to welcoming you.' },
   pending_payment: { pill: 'pending', label: 'Awaiting payment', title: 'Your room is on hold', body: '' },
   payment_review: { pill: 'pending', label: 'Payment received', title: 'Thank you, payment received', body: 'Our reservations team is finalising your room and will contact you shortly.' },
@@ -153,7 +154,11 @@ export default function BookingStatus() {
                 <div><dt>Guest</dt><dd>{booking.guest_name}<br />{booking.guest_email} · {booking.guest_phone}</dd></div>
                 {booking.special_requests && <div><dt>Requests</dt><dd>{booking.special_requests}</dd></div>}
                 {booking.tax_paise > 0 && <div><dt>Taxes</dt><dd>{rupees(booking.tax_paise)}</dd></div>}
-                <div className="summary-total"><dt>{booking.status === 'confirmed' ? 'Paid' : 'Total'}</dt><dd>{rupees(booking.total_paise)}</dd></div>
+                <div className="summary-total">
+                  <dt>{booking.status === 'requested' ? 'Estimated total'
+                    : booking.status === 'confirmed' ? (booking.payment_status ? 'Paid' : 'Payable at the hotel') : 'Total'}</dt>
+                  <dd>{rupees(booking.total_paise)}</dd>
+                </div>
                 {booking.confirmed_at && <div><dt>Confirmed</dt><dd>{dateTime(booking.confirmed_at)}</dd></div>}
                 {booking.cancellation_policy && <div><dt>Cancellation policy</dt><dd>{booking.cancellation_policy}</dd></div>}
               </dl>

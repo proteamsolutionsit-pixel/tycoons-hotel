@@ -9,6 +9,7 @@ class AdminRole(str, enum.Enum):
 
 
 class BookingStatus(str, enum.Enum):
+    REQUESTED = "requested"              # booking request (no online payment); staff confirm or decline; holds no room
     PENDING_PAYMENT = "pending_payment"  # inventory held until hold_expires_at
     CONFIRMED = "confirmed"              # payment captured and verified
     PAYMENT_REVIEW = "payment_review"    # money captured but the hold had lapsed and the room is gone: refund or rehouse

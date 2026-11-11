@@ -25,7 +25,7 @@ from app.schemas.admin import (
     PaymentRow,
 )
 from app.schemas.common import Page
-from app.services import audit, notifications, payment_service
+from app.services import audit, booking_service, notifications, payment_service
 from app.services.razorpay_gateway import PaymentGateway, get_gateway
 
 router = APIRouter(tags=["Admin: bookings & payments"])
@@ -147,11 +147,14 @@ def cancel_booking(booking_id: int, data: CancelIn, request: Request,
 
 
 @router.post("/bookings/{booking_id}/confirm", response_model=BookingDetail,
-             summary="Confirm a payment-review booking once a room has been found")
+             summary="Confirm a booking request, or a payment-review booking once a room has been found")
 def confirm_review(booking_id: int, data: ConfirmReviewIn, request: Request, background: BackgroundTasks,
                    actor: AdminUser = Depends(require(Permission.BOOKINGS_MANAGE)), db: Session = Depends(get_db)):
-    _get(db, booking_id)
-    b = payment_service.confirm_after_review(db, booking_id, data.note, actor, request)
+    current = _get(db, booking_id)
+    if current.status == BookingStatus.REQUESTED:
+        b = booking_service.confirm_request(db, booking_id, data.note, actor, request)
+    else:
+        b = payment_service.confirm_after_review(db, booking_id, data.note, actor, request)
     notifications.booking_confirmed(background, b)
     return _detail(db, b)
 

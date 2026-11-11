@@ -8,6 +8,7 @@ import { OccupancyGrid } from './Occupancy';
 import { PageTitle, StatCard, useAdminList } from '../ui';
 
 const ALERTS = [
+  ['booking_requests', 'New booking requests', 'Guests waiting for confirmation. Open each request and confirm or decline it.', '/admin/bookings?status=requested'],
   ['payment_review', 'Payments awaiting review', 'Money captured after the hold lapsed and the room was gone. Rehouse or refund.', '/admin/bookings?status=payment_review'],
   ['refunded_active_booking', 'Refunded but still booked', 'Refunded in Razorpay while the stay is still confirmed. Cancel the booking or re-charge.', '/admin/payments?status=refunded'],
   ['stuck_authorized', 'Authorised, not captured (30 min+)', 'Open the booking and use Reconcile.', '/admin/payments?status=authorized'],

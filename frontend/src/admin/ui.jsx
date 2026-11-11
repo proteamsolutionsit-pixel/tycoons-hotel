@@ -38,7 +38,7 @@ export function PageTitle({ title, subtitle, children }) {
 
 const BADGE_TONE = {
   confirmed: 'good', captured: 'good', active: 'good', admin: 'brand', success: 'good', closed: 'neutral',
-  pending_payment: 'warn', created: 'warn', authorized: 'warn', new: 'info', in_progress: 'info', refund_pending: 'warn',
+  pending_payment: 'warn', requested: 'info', created: 'warn', authorized: 'warn', new: 'info', in_progress: 'info', refund_pending: 'warn',
   payment_review: 'bad', failed: 'bad', denied: 'bad', failure: 'bad',
   cancelled: 'neutral', expired: 'neutral', refunded: 'neutral', hidden: 'neutral', disabled: 'neutral',
   unsubscribed: 'neutral', staff: 'neutral',

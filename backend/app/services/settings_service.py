@@ -13,6 +13,7 @@ from app.services import audit
 
 _PHONE = re.compile(r"^\+?\(?[0-9][0-9 ()./-]{4,23}[0-9]$")
 MAX_LANDLINES = 10
+_EMAIL = re.compile(r"^[^@\s,;<>]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
 _GOOGLE_MAPS_EMBED = re.compile(r"^https://(www\.)?google\.[a-z.]{2,10}/maps/embed\?[^\s<>\"']{1,1500}$")
 
 
@@ -31,6 +32,13 @@ def validate(row: SiteSetting, value: Any) -> None:
     if row.key == "map_embed_url":
         if value and (not isinstance(value, str) or not _GOOGLE_MAPS_EMBED.match(value)):
             _bad("Use the src of a Google Maps embed (https://www.google.com/maps/embed?…).")
+        return
+    if row.key == "booking_request_emails":
+        if not isinstance(value, str) or len(value) > 500:
+            _bad("Enter one or more email addresses separated by commas.")
+        addresses = [a.strip() for a in value.replace(";", ",").split(",") if a.strip()]
+        if len(addresses) > 5 or any(not _EMAIL.match(a) for a in addresses):
+            _bad("Enter up to 5 valid email addresses separated by commas.")
         return
     if row.key == "landline_numbers":
         if not isinstance(value, list) or len(value) > MAX_LANDLINES:

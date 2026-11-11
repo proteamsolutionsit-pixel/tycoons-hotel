@@ -5,7 +5,7 @@ import { dateOnly, dateTime, guestsLabel, longDate, rateBreakdown, rupees, stayR
 import { Can, useAuth } from '../auth';
 import { Badge, ConfirmDialog, Drawer, ExportButton, PAGE_SIZES, PageTitle, Pager, SearchBox, SortHeader, StateRow, useAdminList, useToast } from '../ui';
 
-const STATUSES = ['', 'pending_payment', 'confirmed', 'payment_review', 'cancelled', 'expired'];
+const STATUSES = ['', 'requested', 'pending_payment', 'confirmed', 'payment_review', 'cancelled', 'expired'];
 
 export default function Bookings() {
   const [params, setParams] = useSearchParams();
@@ -192,6 +192,9 @@ function BookingDetail({ id, onClose, onChanged }) {
                 <input id="b-reason" className="adm-input" value={reason} maxLength={255} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Guest asked to cancel by phone" />
               </div>
               <div className="adm-btn-row">
+                {b.status === 'requested' && (
+                  <button type="button" className="adm-btn" disabled={reason.trim().length < 3} onClick={() => setDialog('review')}>Confirm booking</button>
+                )}
                 {b.status === 'payment_review' && (
                   <button type="button" className="adm-btn" disabled={reason.trim().length < 3} onClick={() => setDialog('review')}>Confirm booking (room found)</button>
                 )}
@@ -199,7 +202,7 @@ function BookingDetail({ id, onClose, onChanged }) {
                   <button type="button" className="adm-btn adm-btn--danger" disabled={reason.trim().length < 3} onClick={() => setDialog('refund')}>Cancel and refund {amountText}</button>
                 )}
                 <button type="button" className="adm-btn adm-btn--ghost" disabled={reason.trim().length < 3} onClick={() => setDialog('cancel')}>
-                  {captured ? 'Cancel without refund' : 'Cancel booking'}
+                  {b.status === 'requested' ? 'Decline request' : captured ? 'Cancel without refund' : 'Cancel booking'}
                 </button>
               </div>
               {reason.trim().length < 3 && <small className="adm-muted">Enter a reason to enable these actions.</small>}
@@ -228,7 +231,9 @@ function BookingDetail({ id, onClose, onChanged }) {
       {dialog === 'review' && b && (
         <ConfirmDialog title={`Confirm ${b.reference}?`} confirmLabel="Confirm booking" busy={busy} onCancel={() => setDialog(null)}
           onConfirm={() => run(() => api.post(`/api/v1/admin/bookings/${b.id}/confirm`, { note: reason }), 'Booking confirmed; the guest has been emailed.')}>
-          <p>Use this once a {b.room_type_name} is free for these dates (for example after raising inventory). The system checks availability again before confirming.</p>
+          {b.status === 'requested'
+            ? <p>Confirms this booking request. The system checks that {b.room_count > 1 ? `${b.room_count} rooms are` : 'a room is'} still free, then emails the guest a confirmation with the amount payable at the hotel.</p>
+            : <p>Use this once a {b.room_type_name} is free for these dates (for example after raising inventory). The system checks availability again before confirming.</p>}
         </ConfirmDialog>
       )}
     </Drawer>
