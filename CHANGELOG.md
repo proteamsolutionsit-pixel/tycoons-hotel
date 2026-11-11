@@ -69,6 +69,31 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0024 — Guest emails sent from reservations@thetycoonshotel.com
+- **Date:** 2026-11-11 · **Module:** Notifications / outgoing mail · **Change type:** Configuration, Enhancement
+- **Environment:** Development, Staging · **Status:** Deployed (staging) · **Related commit:** see `git log` · **Release:** REL-0014
+
+**Reason:** Customers should receive mail from reservations@thetycoonshotel.com.
+**Previous behaviour:** All mail from `no-reply@devtycoonshotel.proteam.co.in` (CHG-0023), envelope sender chosen by the host.
+**New behaviour:** `MAIL_FROM` on staging = "The Tycoons Hotel <reservations@thetycoonshotel.com>"; the sendmail
+transport now also sets the **envelope sender** (`-f`) to that address, so SPF is evaluated for thetycoonshotel.com.
+Applies to every outgoing email (guest acknowledgements and confirmations, hotel request emails, password resets);
+guest replies go to that mailbox.
+**Why this domain works from this server (checked 2026-11-11):** thetycoonshotel.com resolves to the same host
+(78.159.97.108); its SPF record is `v=spf1 ip4:78.159.97.108 +a +mx ~all` (this server authorised); DMARC `p=none`.
+**Files modified:** `backend/app/services/mailer.py`, `backend/tests/test_booking_requests.py`, `CHANGELOG.md`;
+server `tycoons/.env` (`MAIL_FROM`; previous file backed up to `.tools/server-backup/`).
+**Security impact:** None new; the sender is fixed by server configuration, not by request data.
+**Testing performed:** `test_booking_requests.py` **14 passed** (sendmail called with `-f` = the From address; From header
+carries reservations@thetycoonshotel.com). Full backend suite *not re-run* for this two-line change (last full run:
+407 passed at `e45bedb`). Live: configuration loaded and site healthy; *no live email sent for this change* —
+the next booking request will be the first from the new address.
+**Not verified:** that the mailbox reservations@thetycoonshotel.com exists to receive replies, and DKIM signing for
+thetycoonshotel.com on this server.
+**Rollback plan:** set `MAIL_FROM` back in the server `.env` and restart (no code change needed).
+
+---
+
 ### CHG-0023 — Booking requests by email instead of online payment
 - **Date:** 2026-11-11 · **Version:** API 1.1.0 · **Module:** Booking, payment settings, notifications, admin
 - **Change type:** Feature, Configuration, API · **Environment:** Development, Staging · **Status:** Deployed (staging)

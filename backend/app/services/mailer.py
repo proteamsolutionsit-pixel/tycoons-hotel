@@ -8,6 +8,7 @@ import smtplib
 import ssl
 import subprocess  # noqa: S404 - fixed path, no shell, message on stdin
 from email.message import EmailMessage
+from email.utils import parseaddr
 
 from app.core.config import get_settings
 
@@ -31,8 +32,10 @@ def send_mail(to: str, subject: str, body: str) -> None:
     if s.smtp_host == "sendmail":
         # The host's own MTA (cPanel/Exim): no credentials needed; recipients come from the headers
         try:
-            subprocess.run([SENDMAIL, "-t", "-i"], input=msg.as_bytes(), check=True, timeout=30,  # noqa: S603
-                           capture_output=True)
+            # Envelope sender = the From address, so SPF is checked against the sender's own domain
+            envelope = parseaddr(s.mail_from)[1]
+            args = [SENDMAIL, "-t", "-i"] + (["-f", envelope] if envelope else [])
+            subprocess.run(args, input=msg.as_bytes(), check=True, timeout=30, capture_output=True)  # noqa: S603
             log.info("Mail sent", extra={"mail_to": to, "mail_subject": subject, "transport": "sendmail"})
         except Exception:
             log.exception("Mail delivery failed", extra={"mail_to": to, "mail_subject": subject, "transport": "sendmail"})

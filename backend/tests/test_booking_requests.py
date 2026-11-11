@@ -143,5 +143,22 @@ def test_sendmail_transport_pipes_the_message(monkeypatch, settings):
         mailer.send_mail("desk@tycoons.example.com", "Booking request TYC1", "Hello")
     finally:
         settings.smtp_host = ""
-    assert calls[0][0] == ["/usr/sbin/sendmail", "-t", "-i"]
+    assert calls[0][0] == ["/usr/sbin/sendmail", "-t", "-i", "-f", "no-reply@example.com"]   # envelope = From address
     assert b"To: desk@tycoons.example.com" in calls[0][1] and b"Subject: Booking request TYC1" in calls[0][1]
+
+
+def test_sendmail_uses_the_configured_sender(monkeypatch, settings):
+    import subprocess
+
+    from app.services import mailer
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda args, **kw: calls.append((args, kw["input"])))
+    settings.smtp_host, old_from = "sendmail", settings.mail_from
+    settings.mail_from = "The Tycoons Hotel <reservations@thetycoonshotel.com>"
+    try:
+        mailer.send_mail("guest@tycoons.example.com", "We received your booking request - TYC1", "Hello")
+    finally:
+        settings.smtp_host, settings.mail_from = "", old_from
+    args, raw = calls[0]
+    assert args[-2:] == ["-f", "reservations@thetycoonshotel.com"]
+    assert b"From: The Tycoons Hotel <reservations@thetycoonshotel.com>" in raw
