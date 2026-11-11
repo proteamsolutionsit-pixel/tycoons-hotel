@@ -71,8 +71,8 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ### CHG-0023 — Booking requests by email instead of online payment
 - **Date:** 2026-11-11 · **Version:** API 1.1.0 · **Module:** Booking, payment settings, notifications, admin
-- **Change type:** Feature, Configuration, API · **Environment:** Development · **Status:** Tested
-- **Related commit:** see `git log` · **Feature:** FEAT-0014 · **Security:** SEC-0017
+- **Change type:** Feature, Configuration, API · **Environment:** Development, Staging · **Status:** Deployed (staging)
+- **Related commit:** `e45bedb` · **Feature:** FEAT-0014 · **Security:** SEC-0017 · **Release:** REL-0013
 
 **Reason:** The hotel wants guests to send a booking request after entering their details, emailed to
 sudheesh.c@proteamsolutions.co.in, instead of paying online.
@@ -134,6 +134,16 @@ needs no migration. One new `site_settings` row via `app.cli seed`.
 **Deployment notes:** Release → restart; server `.env`: `SMTP_HOST=sendmail`, `MAIL_FROM` on the site's domain;
 `app.cli seed` (after backup); Admin → Site settings → *Booking request emails* = the hotel's address;
 Admin → Payment gateway → *Booking requests by email*.
+**Deployed to staging 2026-11-11 (REL-0013):** server `.env` gained `SMTP_HOST=sendmail` and `MAIL_FROM`
+(no-reply on the site's domain; previous `.env` kept in `.tools/server-backup/`); backup
+`tycoons-20261111T072311Z.sql.gz`; `app.cli seed` added the recipient setting. Through the admin API (audited):
+*Booking request emails* = sudheesh.c@proteamsolutions.co.in; Payment gateway = booking requests
+(`active=request`; availability now reports `booking_mode: request`).
+**Live check:** one request marked TEST (Twin Room, 2 adults) → 201, status `requested`, no checkout; server log
+shows **"Mail sent" via sendmail** to sudheesh.c@proteamsolutions.co.in ("Booking request TYCY77XZ5KP - Twin Room,
+26 Dec to 27 Dec 2026") and to the dummy guest address; dashboard `booking_requests` = 1; the test request was then
+declined (status `cancelled`, reason recorded). *Delivery to the recipient's inbox is not verified from here*
+(the MTA accepted the message; the recipient should confirm receipt, including the spam folder).
 **Rollback plan:** Switch Payment gateway back to Razorpay/test payments (no deploy needed). Code rollback:
 redeploy the previous release; any `requested` bookings remain readable in the database.
 
@@ -651,7 +661,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Date | Area | Concern | Remediation | Evidence | Residual risk / limits | Ref | Status |
 |---|---|---|---|---|---|---|---|---|
-| SEC-0017 | 2026-11-11 | Booking requests / email | Public endpoint now sends email to the hotel and the guest — spam and mail-bombing risk; recipient list must not leak | Per-IP (10/10 min) and per-guest-email (5/h) limits; idempotent replays not re-emailed; recipients private and validated; sendmail via fixed path, no shell | `test_booking_requests.py` (replay, privacy, validation, transport) | A determined sender rotating IPs and addresses can still send some requests; CAPTCHA not added | OWASP A04 | Tested |
+| SEC-0017 | 2026-11-11 | Booking requests / email | Public endpoint now sends email to the hotel and the guest — spam and mail-bombing risk; recipient list must not leak | Per-IP (10/10 min) and per-guest-email (5/h) limits; idempotent replays not re-emailed; recipients private and validated; sendmail via fixed path, no shell | `test_booking_requests.py` (replay, privacy, validation, transport) | A determined sender rotating IPs and addresses can still send some requests; CAPTCHA not added | OWASP A04 | Tested; deployed (staging) |
 | SEC-0016 | 2026-10-23 | Database hosting | Remote MySQL access to the staging DB from an external IP | Remote-access host removed in cPanel; DB users scoped to `localhost`; app account limited to DML | External login refused (checked 2026-10-23) | — | OWASP A05 | Verified (staging) |
 | SEC-0015 | 2026-10-26 | Repository | Third-party code (virtualenv) in history; risk of secrets in history before publishing | Virtualenv removed from all commits; `.venv*/` ignored; full-history scan for 11 real secret values | Scan: none found | Remote not yet pushed; scan covers known secrets only | CWE-540 | Verified |
 | SEC-0014 | 2026-10-26 | Staff accounts | Email change could be used to take over a higher-privileged account | Email editable only within the editor's own access; unique; audited | Tests: change, duplicate 409, HR user → admin email 403 | — | CWE-639, OWASP A01 | Verified; deployed |
@@ -694,7 +704,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Feature | Requirement | Behaviour | Change | Config needed | Tests | Release status |
 |---|---|---|---|---|---|---|---|
-| FEAT-0014 | Booking requests by email | Replace online payment with an emailed request | Requested status, emails to recipients and guest, staff confirm/decline | CHG-0023 | Mode in Payment gateway; recipients in Site settings; server mail | 13 backend, 31 frontend | Tested |
+| FEAT-0014 | Booking requests by email | Replace online payment with an emailed request | Requested status, emails to recipients and guest, staff confirm/decline | CHG-0023 | Mode in Payment gateway; recipients in Site settings; server mail | 407 backend, 31 frontend | Deployed (staging) |
 | FEAT-0013 | Multiple landline numbers | Publish several landlines | Labelled numbers in footer and Contact page, tel: links | CHG-0020 | Enter numbers in Site settings | 394 backend, 31 frontend | Deployed (staging) |
 | FEAT-0012 | Occupancy-based rates + inclusions | Twin Room: single ₹3,500, double ₹4,500, breakfast included | Single rate for one-adult rooms; tariff and breakdown shown | CHG-0019 | Enter rates per room type in the admin | 389 backend, 30 frontend | Deployed (staging) |
 | FEAT-0011 | Multi-room bookings | Offer enough rooms when a party exceeds one room | Fewest rooms per type; one payment | CHG-0017 | `MAX_ROOMS_PER_BOOKING` (optional) | 384 backend, 28 frontend | Deployed (staging) |
@@ -801,6 +811,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0013 | 2026-11-11 | `tycoons-20261111T072020Z` | CHG-0023 (+ `.env` mail settings, seed, request mode and recipient set) | — | TEST request emailed via sendmail to the recipient; declined afterwards; bundle matched |
 | REL-0012 | 2026-11-06 | `tycoons-20261106T072805Z` | CHG-0022 | — | Bundle matched; ready 200 |
 | REL-0011 | 2026-11-06 | `tycoons-20261106T063307Z` | CHG-0021 | — | Live CSS contains the fix; bundle matched; ready 200 |
 | REL-0010 | 2026-11-06 | `tycoons-20261106T062024Z` | CHG-0020 (+ `app.cli seed`: 1 setting added) | — | Setting present; invalid number 422; bundle matched |
