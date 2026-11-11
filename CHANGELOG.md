@@ -69,6 +69,19 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0027 — Booking requests now emailed to reservations@thetycoonshotel.com
+- **Date:** 2026-11-11 · **Module:** Site settings (content) · **Change type:** Configuration (data)
+- **Environment:** Staging · **Status:** Deployed (staging) · **Related commit:** none (setting change, no code)
+
+**Change:** Site setting *Booking request emails* changed from sudheesh.c@proteamsolutions.co.in to
+reservations@thetycoonshotel.com through the admin API (audited as `setting.update`). Payment mode unchanged (`request`).
+**Testing performed:** API returned the new value; payment mode still `request`. *No test email sent.*
+**Not verified:** that the mailbox reservations@thetycoonshotel.com exists — thetycoonshotel.com is hosted on another
+cPanel account on the same server, so it is not visible from this account.
+**Rollback:** edit *Booking request emails* in Admin → Site settings.
+
+---
+
 ### CHG-0026 — Sender back to no-reply@devtycoonshotel.proteam.co.in; mailbox created for replies
 - **Date:** 2026-11-11 · **Module:** Outgoing mail (configuration) · **Change type:** Configuration
 - **Environment:** Staging · **Status:** Deployed (staging) · **Related commit:** none (server configuration only) · **Supersedes:** CHG-0024's sender
@@ -894,6 +907,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | Item | Detail | Owner |
 |---|---|---|
+| Mailbox reservations@thetycoonshotel.com (CHG-0027) | Booking requests are sent there; confirm the mailbox exists in the cPanel account that hosts thetycoonshotel.com | Hotel / IT |
 | DNS for mail from devtycoonshotel.proteam.co.in (CHG-0026) | At the proteam.co.in DNS provider (OrderBox): TXT `devtycoonshotel.proteam.co.in` = `v=spf1 ip4:78.159.97.108 ~all`; TXT `default._domainkey.devtycoonshotel.proteam.co.in` = the DKIM value shown in cPanel → Email Deliverability; optional MX `devtycoonshotel.proteam.co.in` → `devtycoonshotel.proteam.co.in` (priority 0). Then cPanel → Email Deliverability should show both VALID | IT / domain owner |
 | Child pricing (CHG-0019) | Children do not change the occupancy rate (1 adult + 1 child pays the single rate). Confirm with the hotel; changing it is a one-line rule in `availability.quote` | Hotel |
 | Razorpay keys | Staging uses test payments; live/test keys to be entered in Admin > Payment gateway | Hotel |
