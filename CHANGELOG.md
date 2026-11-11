@@ -69,6 +69,24 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0026 — Sender back to no-reply@devtycoonshotel.proteam.co.in; mailbox created for replies
+- **Date:** 2026-11-11 · **Module:** Outgoing mail (configuration) · **Change type:** Configuration
+- **Environment:** Staging · **Status:** Deployed (staging) · **Related commit:** none (server configuration only) · **Supersedes:** CHG-0024's sender
+
+**Reason:** The hotel chose no-reply@devtycoonshotel.proteam.co.in as the address to send from and receive replies at.
+**Change:** Server `.env` `MAIL_FROM` = "The Tycoons Hotel <no-reply@devtycoonshotel.proteam.co.in>" (previous file
+backed up to `.tools/server-backup/`); app restarted. Mailbox **no-reply@devtycoonshotel.proteam.co.in** created in
+cPanel (250 MB) so replies and bounces are received; its password is stored only in `.tools/no-reply-mailbox.txt`
+(git-ignored). The envelope-sender code from CHG-0024 stays (it now uses this address).
+**Deliverability (checked 2026-11-11):** for devtycoonshotel.proteam.co.in public DNS has **no SPF and no DKIM
+record** (DNS for proteam.co.in is at the registrar, OrderBox, not this server); cPanel holds a DKIM key and reports
+both as MISSING. Parent DMARC `p=none` (aspf strict). Until the records are published, mail may be filtered as spam.
+Records to add (see Open items).
+**Testing performed:** Ready 200 after restart; mailbox listed in cPanel. *No email sent for this change.*
+**Rollback:** set `MAIL_FROM` in the server `.env` and restart; delete the mailbox in cPanel if unwanted.
+
+---
+
 ### CHG-0025 — Contact page map set to the hotel's location (content)
 - **Date:** 2026-11-11 · **Module:** Site settings (content) · **Change type:** Configuration (data)
 - **Environment:** Staging · **Status:** Deployed (staging) · **Related commit:** none (content change, no code)
@@ -876,6 +894,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | Item | Detail | Owner |
 |---|---|---|
+| DNS for mail from devtycoonshotel.proteam.co.in (CHG-0026) | At the proteam.co.in DNS provider (OrderBox): TXT `devtycoonshotel.proteam.co.in` = `v=spf1 ip4:78.159.97.108 ~all`; TXT `default._domainkey.devtycoonshotel.proteam.co.in` = the DKIM value shown in cPanel → Email Deliverability; optional MX `devtycoonshotel.proteam.co.in` → `devtycoonshotel.proteam.co.in` (priority 0). Then cPanel → Email Deliverability should show both VALID | IT / domain owner |
 | Child pricing (CHG-0019) | Children do not change the occupancy rate (1 adult + 1 child pays the single rate). Confirm with the hotel; changing it is a one-line rule in `availability.quote` | Hotel |
 | Razorpay keys | Staging uses test payments; live/test keys to be entered in Admin > Payment gateway | Hotel |
 | Email (SMTP) | Not configured; confirmation and password-reset emails are logged, not sent | Hotel / IT |
