@@ -939,6 +939,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0016 | 2026-11-11 | `tycoons-20261111T094050Z` | CHG-0029 | — | All 8 public pages scanned live after deploy: no placeholders on any page |
 | REL-0015 | 2026-11-11 | `tycoons-20261111T090158Z` | CHG-0028 | — | Live Contact page: no placeholders, Getting-here list hidden, map shown; bundle matched |
 | REL-0014 | 2026-11-11 | `tycoons-20261111T074402Z` | CHG-0024 (+ `.env` `MAIL_FROM`); CHG-0025 content | — | Ready 200; mailer with envelope sender on server; booking mode still `request`; map renders, no CSP violations |
 | REL-0013 | 2026-11-11 | `tycoons-20261111T072020Z` | CHG-0023 (+ `.env` mail settings, seed, request mode and recipient set) | — | TEST request emailed via sendmail to the recipient; declined afterwards; bundle matched |
