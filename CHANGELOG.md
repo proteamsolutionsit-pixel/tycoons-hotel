@@ -69,6 +69,48 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0031 — Real hotel photos for rooms, lobby, lounge, gym, corridor and Fishy Tales (staging)
+- **Date:** 2026-11-23 · **Module:** Public site images, gallery · **Change type:** Content / Enhancement
+- **Environment:** Staging only · **Status:** Deployed (staging); **not on live** · **Related commit:** see `git log` · **Release:** REL-0018
+
+**Reason:** The hotel supplied its own photos (`Tycoon Images/`, 13 files) to replace the stock images, first on
+devtycoonshotel.proteam.co.in only.
+**What changed:** the bundled images were replaced under the same file names, so every page and the room and gallery
+records pick them up with no code change. HEIC photos were converted with ffmpeg; each was centre-cropped to the
+original file's aspect ratio and size, sharpened lightly, saved as JPEG, and all metadata (camera, GPS location)
+removed.
+
+| Site image | Used on | New photo |
+|---|---|---|
+| `room-twin.jpg` | Twin Room (rooms, booking, gallery) | IMG_7226 (twin room) |
+| `room-premium.jpg` | Premium Room | premium room |
+| `lobby-lounge.jpg` | Meetings page, gallery "Reception and lobby" | reception |
+| `lounge.jpg` | Home lounge section, Meetings hero, gallery | business lounge |
+| `gal-corridor.jpg` | Gallery "Guest floor corridor" | Floor Passage |
+| `gal-gym.jpg` | Gallery "Fitness centre" | IMG_6560 (gym) |
+| `gal-bar.jpg` | Gallery "Bar counter at Fishy Tales" | WhatsApp 10.37.23 (1) |
+| `gal-restaurant.jpg` | Dining page, Fishy Tales cards, gallery | WhatsApp 10.37.23 |
+| `gal-restaurant-seating.jpg` | Gallery "Fishy Tales restaurant seating" | WhatsApp 10.37.24 |
+| `gal-restaurant-mural.jpg` | Gallery "Fishy Tales seaside mural" | WhatsApp 10.37.24 (1) |
+| `gal-bar-neon.jpg` (new) | Gallery, new entry "Neon-lit bar at Fishy Tales" | WhatsApp 10.37.17 |
+| `gal-restaurant-whales.jpg` (new) | Gallery, new entry "Fishy Tales whale mural dining room" | WhatsApp 10.37.25 |
+
+**Not used:** WhatsApp 10.37.19 (fish fry) carries a third-party watermark ("Vanitas Corner"), so it may not be the
+hotel's own photo; the dish image is unchanged until the hotel confirms the right to use it or sends its own.
+No photos were supplied for the Deluxe Room, Tycoon Suite, spa, pool, breakfast, food or the city hero: those stay as before.
+**Database (staging only):** two `gallery_images` rows added (dining, 900x1200) after a backup of the table
+(`~/backups/gallery_images-20261123T054303Z.sql` on the staging account); 21 rows → 23.
+**Files modified:** `frontend/public/assets/img/` (10 replaced, 2 added), `.gitignore` (`Tycoon Images/` not committed:
+21 MB of originals with location metadata), `CHANGELOG.md`.
+**Security / API / configuration impact:** none. Location metadata stripped from every published image.
+**Testing performed:** each image on staging is byte-identical to the local file (MD5, 12/12); staging gallery
+returns 23 entries; live (`thetycoonshotel.com`) still serves the previous images (12/12 unchanged). Crops checked visually.
+**Live:** goes with the next live deploy. Live's gallery has 16 entries (the 5 added on staging after the go-live
+copy plus these 2 are not there); add them on live when this is released there.
+**Rollback:** redeploy REL-0016's package to staging; delete the two gallery rows (or restore the backup).
+
+---
+
 ### CHG-0031 — The hotel's own photos on the staging site (rooms, lounge, reception, restaurant, bar, gym, corridor)
 - **Date:** 2026-11-23 · **Module:** Content / images · **Change type:** Content, Database (data only)
 - **Environment:** Staging · **Status:** Deployed (staging only; live not changed) · **Related commit:** see `git log`
@@ -1017,6 +1059,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0018 | 2026-11-23 | `tycoons-20261123T054208Z` — **staging only** | CHG-0031 | — (2 gallery rows added, table backed up) | 12/12 images byte-identical on staging; gallery 23 entries; live unchanged |
 | REL-0017 | 2026-11-11 | `tycoons-20261111T094050Z` (same build as REL-0016), **production** thetycoonshotel.com | CHG-0030 (first install) | Fresh schema, all 7 revisions to `4e8b1d6f2c30` | Ready 200; redirects 301; cert valid; headers + CSP; docs 404; booking mode request; 8 pages no placeholders; SPF/DKIM valid |
 | REL-0016 | 2026-11-11 | `tycoons-20261111T094050Z` | CHG-0029 | — | All 8 public pages scanned live after deploy: no placeholders on any page |
 | REL-0015 | 2026-11-11 | `tycoons-20261111T090158Z` | CHG-0028 | — | Live Contact page: no placeholders, Getting-here list hidden, map shown; bundle matched |
@@ -1046,6 +1089,8 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | Item | Detail | Owner |
 |---|---|---|
+| Photos on live (CHG-0031) | New photos are on staging only. On the next live deploy also add the 7 gallery entries live lacks (corridor, gym, bar, seating, seaside mural, neon bar, whale mural) | Development (on request) |
+| Fish-fry photo (CHG-0031) | Supplied image has a "Vanitas Corner" watermark; confirm usage rights or send the hotel's own dish photo | Hotel |
 | Live: change the admin password | The live admin (admintycoon@proteam.co.in) has the same password as staging; change it on thetycoonshotel.com/admin | Hotel |
 | Live: test booking request | Send one booking request on the live site, check that both emails arrive (guest and reservations@), then decline it in the admin | Hotel |
 | Live backups | Set up a nightly backup of `thetycoonshotel_tycoons` (cPanel backups or a cron mysqldump) | IT / Hosting |

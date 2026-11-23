@@ -31,3 +31,5 @@ backups/
 # Hosting credentials (cPanel API token)
 cpanel.txt
 cpanel-live.txt
+# Hotel's original photos (large; HEIC with camera/location metadata) - web copies live in frontend/public/assets/img
+Tycoon Images/
