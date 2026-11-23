@@ -69,6 +69,34 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0031 — The hotel's own photos on the staging site (rooms, lounge, reception, restaurant, bar, gym, corridor)
+- **Date:** 2026-11-23 · **Module:** Content / images · **Change type:** Content, Database (data only)
+- **Environment:** Staging · **Status:** Deployed (staging only; live not changed) · **Related commit:** see `git log`
+
+**Reason:** The hotel supplied 13 photos (`Tycoon Images/`, not committed) and asked for them to replace and add to the room,
+lobby, gym and other pictures on devtycoonshotel.proteam.co.in only.
+**Before:** stock photos under `/assets/img/`; gallery 16 rows.
+**What was done:**
+- **Replaced (same file names, so the pages and the database need no change):** `room-twin.jpg` (twin room photo),
+  `room-premium.jpg` (premium room), `lounge.jpg` (business lounge: home page and Meetings hero), `lobby-lounge.jpg` (reception,
+  Meetings page), `gal-restaurant.jpg` (restaurant with whale murals, Dining page). Each was cropped to the old file's proportions, so the
+  `width`/`height` attributes and the layout stay correct.
+- **Added:** `gal-gym.jpg`, `gal-corridor.jpg`, `gal-bar.jpg`, `gal-restaurant-seating.jpg`, `gal-restaurant-mural.jpg`, with 5 new gallery rows
+  (Fitness centre / wellness, Guest floor corridor / spaces, Bar counter, restaurant seating and seaside mural / dining).
+  Alt text of 2 existing rows changed to match the new pictures: "Hotel lounge" → "Reception and lobby", "Restaurant table setting" → "Fishy Tales restaurant".
+- All images re-encoded as JPEG (quality 82, progressive) at 1200–1800 px, and **all metadata removed**: the iPhone originals carry GPS location.
+- Files uploaded straight into `~/tycoons/frontend_dist/assets/img` and into `frontend/public/assets/img` in the repo, so the next release keeps them.
+  Gallery rows written by the one-off `deploy/oneoff/gallery_photos_20261123.py` (idempotent, matched by `image_url`) via `Invoke-CpOnce`; the script was removed from the server afterwards.
+- **Not used:** the fish dish photo (it carries a "Vanita's Corner" watermark, so it looks like a third party's photo: the hotel should confirm the right to use it or send its own); two near-duplicates (portrait bar and whale-mural shots).
+- **Not changed:** deluxe room, suite, spa, pool, hero slideshow and dining dish (no photos supplied).
+
+**Database impact:** staging `gallery_images` +5 rows, 2 alt texts changed. No schema change.
+**Security impact:** location metadata stripped from published photos. **API / configuration impact:** none.
+**Tests:** all 10 files downloaded back from staging and compared: SHA-256 identical to the local files. `/api/gallery` total 21 with the new rows and alt texts; home page 200. Pages not viewed in a browser (*Not verified* visually).
+**Rollback:** the old images are in git (`git show HEAD~1:frontend/public/assets/img/<name>`); upload them back to the same folder. Gallery rows as they were are in
+`~/tycoons_backups/gallery_images_pre_20261123.json` on staging: delete the 5 new rows (by `image_url`) and restore the 2 alt texts.
+**Deployment notes:** live (thetycoonshotel.com) still has the stock photos; deploy there only when asked, with the same files and the same one-off script (`CP_TARGET=live`).
+
 ### CHG-0030 — Go-live: site installed on thetycoonshotel.com with staging content, no transaction data
 - **Date:** 2026-11-11 · **Module:** Hosting / deployment · **Change type:** Deployment, Configuration
 - **Environment:** Production · **Status:** Deployed (production) · **Related commit:** see `git log` · **Release:** REL-0017
@@ -879,6 +907,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Feature | Requirement | Behaviour | Change | Config needed | Tests | Release status |
 |---|---|---|---|---|---|---|---|
+| FEAT-0015 | Hotel photos | Replace and add photos of rooms, lobby, gym etc. | 5 images replaced, 5 added with gallery rows; metadata stripped | CHG-0031 | — | download-back hash check | Deployed (staging) |
 | FEAT-0014 | Booking requests by email | Replace online payment with an emailed request | Requested status, emails to recipients and guest, staff confirm/decline | CHG-0023 | Mode in Payment gateway; recipients in Site settings; server mail | 407 backend, 31 frontend | Deployed (staging) |
 | FEAT-0013 | Multiple landline numbers | Publish several landlines | Labelled numbers in footer and Contact page, tel: links | CHG-0020 | Enter numbers in Site settings | 394 backend, 31 frontend | Deployed (staging) |
 | FEAT-0012 | Occupancy-based rates + inclusions | Twin Room: single ₹3,500, double ₹4,500, breakfast included | Single rate for one-adult rooms; tariff and breakdown shown | CHG-0019 | Enter rates per room type in the admin | 389 backend, 30 frontend | Deployed (staging) |
