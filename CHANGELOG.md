@@ -69,6 +69,31 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0035 — Tycoon Suite: the hotel's photo replaces the stock pictures (staging)
+- **Date:** 2026-11-23 · **Module:** Rooms, gallery · **Change type:** Content
+- **Environment:** Staging only · **Status:** Deployed (staging); not on live · **Related commit:** see `git log` · **Release:** REL-0021
+
+**Reason:** The hotel added `suite room.heic` and asked for it to replace the existing suite image.
+**What changed:**
+- `hotel/tycoon-suite.jpg` (1440x960, landscape band of the portrait photo: sitting area, sofa, bedroom through the door) —
+  Tycoon Suite room card and the gallery's "Tycoon Suite" entry.
+- `hotel/tycoon-suite-living.jpg` (900x1200, portrait) — the gallery's suite living-area entry, alt "Tycoon Suite living area".
+- Staging DB: `room_types` tycoon-suite repointed; the two suite gallery rows (hidden as stock in CHG-0033) repointed to the new
+  photos and shown again. Backup first: `~/backups/suite-20261123T062804Z.sql`. Gallery Rooms section now: suite living area,
+  twin, premium, suite — all the hotel's own photos.
+- Stock files `room-suite.jpg` and `gal-suite.jpg` removed from the repository (no references left in code, seed or staging DB).
+- HEIC converted with ffmpeg; metadata (GPS) removed; `seed.py` updated for fresh installs.
+**Still stock:** Deluxe Room (no photo supplied).
+**Files modified:** `frontend/public/assets/img/hotel/tycoon-suite.jpg`, `.../tycoon-suite-living.jpg` (new),
+`frontend/public/assets/img/room-suite.jpg`, `gal-suite.jpg` (deleted), `backend/app/seed.py`, `CHANGELOG.md`.
+**Security / API / configuration impact:** none. **Database impact (staging):** 3 rows updated.
+**Testing performed:** frontend 33 passed; staging rooms API returns `/assets/img/hotel/tycoon-suite.jpg`; both files 200,
+`Cache-Control: no-cache`, checksums identical to local; gallery lists both suite photos.
+**Live:** with the next live deploy (live DB still points at the stock suite files, which that deploy must repoint).
+**Rollback:** restore the backup; `git show HEAD~1:frontend/public/assets/img/room-suite.jpg`.
+
+---
+
 ### CHG-0034 — Browsers kept showing the old room photos: new photo URLs and cache headers (staging)
 - **Date:** 2026-11-23 · **Module:** Static files, images · **Change type:** Bug fix · **Bug:** BUG-0013
 - **Environment:** Staging only · **Status:** Deployed (staging); not on live · **Related commit:** see `git log` · **Release:** REL-0020
@@ -1119,6 +1144,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0021 | 2026-11-23 | `tycoons-20261123T062710Z` — **staging only** | CHG-0035 | — (3 rows repointed, tables backed up) | Suite photos 200 + no-cache, checksums match; rooms API and gallery updated |
 | REL-0020 | 2026-11-23 | `tycoons-20261123T061815Z` — **staging only** | CHG-0034 | — (18 image URLs repointed, tables backed up) | 411 backend + 33 frontend; new URLs 200, headers no-cache/immutable, checksums match |
 | REL-0019 | 2026-11-23 | `tycoons-20261123T055134Z` — **staging only** | CHG-0033 | — (3 gallery rows hidden, table backed up) | 33 frontend tests; bundle and image verified; gallery rooms = twin + premium; banner screenshot |
 | REL-0018 | 2026-11-23 | `tycoons-20261123T054208Z` — **staging only** | CHG-0031 (files uploaded directly), CHG-0032 | — (2 gallery rows added, table backed up) | 12/12 images byte-identical on staging; gallery 23 entries; live unchanged |
@@ -1151,7 +1177,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | Item | Detail | Owner |
 |---|---|---|
-| Photos on live (CHG-0031–0034) | New photos are on staging only. On the next live deploy also add the 7 gallery entries live lacks (CHG-0031 script: corridor, gym, bar, seating, seaside mural + alt texts; CHG-0032: neon bar, whale mural) and hide the 3 stock room rows (CHG-0033); repoint image URLs to `/assets/img/hotel/` (CHG-0034) | Development (on request) |
+| Photos on live (CHG-0031–0035) | New photos are on staging only. On the next live deploy also add the 7 gallery entries live lacks (CHG-0031 script: corridor, gym, bar, seating, seaside mural + alt texts; CHG-0032: neon bar, whale mural) and hide the 3 stock room rows (CHG-0033); repoint image URLs to `/assets/img/hotel/` (CHG-0034); suite card + 2 suite gallery rows to the suite photos, re-activated (CHG-0035) | Development (on request) |
 | Fish-fry photo (CHG-0031/0032) | Supplied image has a "Vanitas Corner" watermark; confirm usage rights or send the hotel's own dish photo | Hotel |
 | Live: change the admin password | The live admin (admintycoon@proteam.co.in) has the same password as staging; change it on thetycoonshotel.com/admin | Hotel |
 | Live: test booking request | Send one booking request on the live site, check that both emails arrive (guest and reservations@), then decline it in the admin | Hotel |

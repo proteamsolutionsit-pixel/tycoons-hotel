@@ -41,7 +41,7 @@ ROOMS = [
          summary="More space to unwind, with a lounge corner and elevated in-room touches.",
          description="More space to unwind, with a lounge corner and elevated in-room touches for longer stays.",
          base_rate_paise=950000, total_rooms=10),
-    dict(slug="tycoon-suite", name="Tycoon Suite", sort_order=4, image_url=IMG + "room-suite.jpg",
+    dict(slug="tycoon-suite", name="Tycoon Suite", sort_order=4, image_url=IMG + "hotel/tycoon-suite.jpg",
          image_alt="Tycoon Suite", is_signature=True,
          summary="Separate living space and residential-style privacy — our finest address.",
          description="A separate living space and residential-style privacy. Our finest address in the hotel.",
@@ -92,12 +92,12 @@ L, WD, N = GalleryLayout.LARGE, GalleryLayout.WIDE, GalleryLayout.NORMAL
 # (file, alt, category, layout, width, height, home_order or None) - mosaic order of the Gallery page
 GALLERY = [
     ("hero-city.jpg", "City skyline at dusk", S, L, 1920, 1280, None),
-    ("gal-suite.jpg", "Suite living area", R, N, 900, 600, 2),
+    ("hotel/tycoon-suite-living.jpg", "Tycoon Suite living area", R, N, 900, 1200, 2),
     ("hotel/twin-room.jpg", "Twin room", R, N, 1000, 667, None),
     ("hotel/premium-room.jpg", "Premium room", R, N, 720, 470, None),
     ("room-deluxe.jpg", "Deluxe room", R, N, 720, 470, None),
     ("hotel/business-lounge.jpg", "Business lounge", S, WD, 1200, 800, None),
-    ("room-suite.jpg", "Tycoon Suite", R, N, 720, 470, None),
+    ("hotel/tycoon-suite.jpg", "Tycoon Suite", R, N, 1440, 960, None),
     ("hotel/reception.jpg", "Hotel lounge", S, N, 600, 417, None),
     ("dining-dish.jpg", "Fishy Tales dish", D, N, 1200, 800, None),
     ("hotel/fishy-tales-restaurant.jpg", "Restaurant table setting", D, N, 800, 522, 4),
