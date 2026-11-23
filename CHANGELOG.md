@@ -69,6 +69,32 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0033 — Stock room photos removed: Twin and Premium Room photos used instead (staging)
+- **Date:** 2026-11-23 · **Module:** Rooms page, home slideshow, gallery · **Change type:** Content / Enhancement
+- **Environment:** Staging only · **Status:** Deployed (staging); not on live · **Related commit:** see `git log` · **Release:** REL-0019
+
+**Reason:** The hotel asked for its Twin Room and Premium Room photos to be used for the rooms and the existing
+(stock) room images removed.
+**Before:** the room cards already showed the hotel's photos (CHG-0031/0032), but stock pictures were still used for
+the Rooms page banner and the home slideshow (`gal-suite.jpg`, a stock apartment), and the gallery's Rooms section also
+showed stock "Suite living area", "Deluxe room" and "Tycoon Suite" pictures.
+**After:**
+- Rooms page banner and the second home slideshow slide use the Premium Room photo (`room-premium.jpg`, now exported at
+  1920x1254 for full-width use; same proportions, so room cards and gallery are unaffected).
+- Gallery: the 3 stock room rows hidden (`is_active = 0`, ids 2, 5, 7), not deleted; the Rooms section now shows only the
+  Twin Room and Premium Room photos. Backup before the change: `~/backups/gallery_images-20261123T055203Z.sql` (staging).
+- `Twin Room.PNG` in `Tycoon Images/` is the same photo as the earlier `IMG_7226.PNG` (renamed), already in use.
+**Still stock:** the Deluxe Room and Tycoon Suite room cards (no photos supplied for them; `gal-suite.jpg` file kept but unused).
+**Files modified:** `frontend/src/pages/Rooms.jsx`, `frontend/src/components/home/HeroSlideshow.jsx`,
+`frontend/public/assets/img/room-premium.jpg`, `CHANGELOG.md`.
+**Security / API / configuration impact:** none. **Database impact (staging):** 3 gallery rows deactivated.
+**Testing performed:** frontend **33 passed**; served bundle `index-DZINiWYW.js` references `room-premium` and no `gal-suite`;
+`room-premium.jpg` on staging byte-identical to local; gallery API lists only `room-twin.jpg` and `room-premium.jpg` among room
+pictures; Rooms page banner checked in a browser screenshot.
+**Rollback:** revert the two JSX lines; set `is_active = 1` for gallery ids 2, 5, 7 (Admin > Gallery) or restore the backup.
+
+---
+
 ### CHG-0032 — Hotel photos re-cut from the originals; two more Fishy Tales gallery photos (staging)
 - **Date:** 2026-11-23 · **Module:** Public site images, gallery · **Change type:** Content / Enhancement
 - **Environment:** Staging only · **Status:** Deployed (staging); **not on live** · **Related commit:** `f63c838` · **Release:** REL-0018
@@ -1062,6 +1088,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0019 | 2026-11-23 | `tycoons-20261123T055134Z` — **staging only** | CHG-0033 | — (3 gallery rows hidden, table backed up) | 33 frontend tests; bundle and image verified; gallery rooms = twin + premium; banner screenshot |
 | REL-0018 | 2026-11-23 | `tycoons-20261123T054208Z` — **staging only** | CHG-0031 (files uploaded directly), CHG-0032 | — (2 gallery rows added, table backed up) | 12/12 images byte-identical on staging; gallery 23 entries; live unchanged |
 | REL-0017 | 2026-11-11 | `tycoons-20261111T094050Z` (same build as REL-0016), **production** thetycoonshotel.com | CHG-0030 (first install) | Fresh schema, all 7 revisions to `4e8b1d6f2c30` | Ready 200; redirects 301; cert valid; headers + CSP; docs 404; booking mode request; 8 pages no placeholders; SPF/DKIM valid |
 | REL-0016 | 2026-11-11 | `tycoons-20261111T094050Z` | CHG-0029 | — | All 8 public pages scanned live after deploy: no placeholders on any page |
@@ -1092,7 +1119,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | Item | Detail | Owner |
 |---|---|---|
-| Photos on live (CHG-0031, CHG-0032) | New photos are on staging only. On the next live deploy also add the 7 gallery entries live lacks (CHG-0031 script: corridor, gym, bar, seating, seaside mural + alt texts; CHG-0032: neon bar, whale mural) | Development (on request) |
+| Photos on live (CHG-0031–0033) | New photos are on staging only. On the next live deploy also add the 7 gallery entries live lacks (CHG-0031 script: corridor, gym, bar, seating, seaside mural + alt texts; CHG-0032: neon bar, whale mural) and hide the 3 stock room rows (CHG-0033) | Development (on request) |
 | Fish-fry photo (CHG-0031/0032) | Supplied image has a "Vanitas Corner" watermark; confirm usage rights or send the hotel's own dish photo | Hotel |
 | Live: change the admin password | The live admin (admintycoon@proteam.co.in) has the same password as staging; change it on thetycoonshotel.com/admin | Hotel |
 | Live: test booking request | Send one booking request on the live site, check that both emails arrive (guest and reservations@), then decline it in the admin | Hotel |
