@@ -14,7 +14,7 @@ export default function Rooms() {
 
   return (
     <>
-      <PageHero booking image="/assets/img/room-premium.jpg" alt="Premium room" width="1920" height="1254"
+      <PageHero booking image="/assets/img/hotel/premium-room.jpg" alt="Premium room" width="1920" height="1254"
         kicker="Accommodations" title="Rooms & Suites" lede="Rooms and suites, designed for rest between busy days." />
       <BookingBar className="booking booking--page" />
 

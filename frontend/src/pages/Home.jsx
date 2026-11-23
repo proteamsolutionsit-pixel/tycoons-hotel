@@ -53,7 +53,7 @@ export default function Home() {
       <section className="section feature" id="meetings" aria-labelledby="meetings-title">
         <div className="wrap split">
           <div className="feature__media feature__media--parallax" data-clip="">
-            <img src="/assets/img/lounge.jpg" alt="Business lounge" width="1200" height="800" loading="lazy" data-parallax="" />
+            <img src="/assets/img/hotel/business-lounge.jpg" alt="Business lounge" width="1200" height="800" loading="lazy" data-parallax="" />
           </div>
           <div className="stack" data-reveal-children="">
             <p className="kicker">Business Lounge</p>

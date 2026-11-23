@@ -12,14 +12,14 @@ export default function Meetings() {
 
   return (
     <>
-      <PageHero image="/assets/img/lounge.jpg" alt="Business lounge" width="1200" height="800"
+      <PageHero image="/assets/img/hotel/business-lounge.jpg" alt="Business lounge" width="1200" height="800"
         kicker="Business Lounge" title="Built for the way you work"
         lede="A business lounge and a team that takes care of every detail." />
 
       <section className="section feature" aria-labelledby="work-title">
         <div className="wrap split">
           <div className="feature__media feature__media--parallax" data-clip="">
-            <img src="/assets/img/lobby-lounge.jpg" alt="Hotel lounge" width="600" height="417" loading="lazy" data-parallax="" />
+            <img src="/assets/img/hotel/reception.jpg" alt="Hotel lounge" width="600" height="417" loading="lazy" data-parallax="" />
           </div>
           <div className="stack" data-reveal="">
             <p className="kicker">For business travellers</p>

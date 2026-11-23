@@ -69,6 +69,36 @@ configuration, dependency and deployment changes. **Newest entries first.**
 
 ## 3. Change history
 
+### CHG-0034 — Browsers kept showing the old room photos: new photo URLs and cache headers (staging)
+- **Date:** 2026-11-23 · **Module:** Static files, images · **Change type:** Bug fix · **Bug:** BUG-0013
+- **Environment:** Staging only · **Status:** Deployed (staging); not on live · **Related commit:** see `git log` · **Release:** REL-0020
+
+**Reported:** "nothing changed in dev": the Twin Room still showed the stock photo in the hotel's browser after CHG-0031–0033.
+**Root cause:** the server had the new photo (checksum identical), but the new photos reused the old file names and the app
+sent images with **no `Cache-Control` header**. Browsers then cache heuristically (a fraction of the file's age since
+`Last-Modified`) and a normal reload does not re-request images, so anyone who had visited before kept the old pictures.
+**Fix:**
+- The hotel's photos moved to new descriptive URLs under `/assets/img/hotel/` (`twin-room.jpg`, `premium-room.jpg`,
+  `business-lounge.jpg`, `reception.jpg`, `corridor.jpg`, `gym.jpg`, `fishy-tales-bar.jpg`, `fishy-tales-restaurant.jpg`,
+  `fishy-tales-whale-room.jpg`, `fishy-tales-seaside-mural.jpg`, `fishy-tales-neon-bar.jpg`, `fishy-tales-whale-mural.jpg`),
+  so every browser fetches them fresh. Pages (`Rooms`, `Home`, `Meetings`, `Dining`, home slideshow) and `seed.py` updated.
+- Staging database repointed: `room_types` 2, `gallery_images` 12, `content_cards` 4 rows; backup first
+  (`~/backups/images-20261123T061903Z.sql`). Rows still on old names are only stock pictures with no hotel photo yet.
+- `backend/app/main.py`: `CachedStaticFiles` — build files with a content hash (`index-PMjHzX08.js`) get
+  `public, max-age=31536000, immutable`; everything else (images, `index.html`, media uploads) gets `no-cache`
+  (re-checked each time, `304` via ETag when unchanged). Future picture changes show without renaming.
+**Files modified:** `backend/app/main.py`, `backend/app/seed.py`, `backend/tests/test_cache_headers.py` (new),
+`frontend/src/pages/{Rooms,Home,Meetings,Dining}.jsx`, `frontend/src/components/home/HeroSlideshow.jsx`,
+`frontend/public/assets/img/hotel/` (12 files moved), `CHANGELOG.md`.
+**Security / API impact:** none (headers only). **Database impact (staging):** image URLs changed in 18 rows.
+**Testing performed:** backend **411 passed** (3 new: images `no-cache`, `304` with ETag, hashed files immutable);
+frontend **33 passed**. Staging: rooms API returns `/assets/img/hotel/twin-room.jpg` and `.../premium-room.jpg`; both 200 with
+`Cache-Control: no-cache` and checksums identical to local; bundle `immutable`; page `no-cache`; ready 200.
+**Live:** the repoint script must run on live together with the release (live database still uses the old names).
+**Rollback:** redeploy REL-0019's package and restore the backup.
+
+---
+
 ### CHG-0033 — Stock room photos removed: Twin and Premium Room photos used instead (staging)
 - **Date:** 2026-11-23 · **Module:** Rooms page, home slideshow, gallery · **Change type:** Content / Enhancement
 - **Environment:** Staging only · **Status:** Deployed (staging); not on live · **Related commit:** see `git log` · **Release:** REL-0019
@@ -959,6 +989,7 @@ Detailed controls: [docs/SECURITY.md](docs/SECURITY.md); findings: [docs/AUDIT.m
 
 | ID | Description | Reproduce | Root cause | Fix | Files | Regression tests | Status |
 |---|---|---|---|---|---|---|---|
+| BUG-0013 | Browsers kept showing the old room photos after they were replaced (CHG-0034) | Visit the Rooms page, replace the image file, reload normally | New photos reused the old file names and images were served with no Cache-Control, so browsers cached them heuristically | Photos moved to new URLs under /assets/img/hotel/; no-cache for images and pages, immutable for hashed build files | backend/app/main.py, pages, seed.py, assets/img/hotel/ | test_cache_headers.py (3) | Fixed (staging) |
 | BUG-0012 | Phone number wrapped onto two lines in the header strip | Long street address on a desktop screen | Address and links shared a fixed-height flex row; links could shrink | Links `white-space: nowrap` and non-shrinking; address truncates with ellipsis | `Header.jsx`, `app.css` | Browser widths 1100–1920 | Fixed; deployed (CHG-0021) |
 | BUG-0011 | Audit details of a role update lost the permission lists | Update a role's permissions; read `role.update` details | Audit sanitiser trims nesting deeper than 3 levels | Flattened to `permissions_added` / `permissions_removed` | `role_service.py` | `test_role_changes_apply_on_the_next_request` | Fixed before release (CHG-0014) |
 | BUG-0010 | Blank admin page for a role without the dashboard | Sign in as such a role; open a page it may not see | Guard redirected to `/admin`, which the role also cannot see | Redirect to the first permitted menu page; message if none | `AdminApp.jsx` | Browser check (redirect to Occupancy) | Fixed before release (CHG-0014) |
@@ -1088,6 +1119,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | ID | Date | Release archive | Contents | Migration | Verification |
 |---|---|---|---|---|---|
+| REL-0020 | 2026-11-23 | `tycoons-20261123T061815Z` — **staging only** | CHG-0034 | — (18 image URLs repointed, tables backed up) | 411 backend + 33 frontend; new URLs 200, headers no-cache/immutable, checksums match |
 | REL-0019 | 2026-11-23 | `tycoons-20261123T055134Z` — **staging only** | CHG-0033 | — (3 gallery rows hidden, table backed up) | 33 frontend tests; bundle and image verified; gallery rooms = twin + premium; banner screenshot |
 | REL-0018 | 2026-11-23 | `tycoons-20261123T054208Z` — **staging only** | CHG-0031 (files uploaded directly), CHG-0032 | — (2 gallery rows added, table backed up) | 12/12 images byte-identical on staging; gallery 23 entries; live unchanged |
 | REL-0017 | 2026-11-11 | `tycoons-20261111T094050Z` (same build as REL-0016), **production** thetycoonshotel.com | CHG-0030 (first install) | Fresh schema, all 7 revisions to `4e8b1d6f2c30` | Ready 200; redirects 301; cert valid; headers + CSP; docs 404; booking mode request; 8 pages no placeholders; SPF/DKIM valid |
@@ -1119,7 +1151,7 @@ credentials files and one-off cron jobs are removed after each deploy.
 
 | Item | Detail | Owner |
 |---|---|---|
-| Photos on live (CHG-0031–0033) | New photos are on staging only. On the next live deploy also add the 7 gallery entries live lacks (CHG-0031 script: corridor, gym, bar, seating, seaside mural + alt texts; CHG-0032: neon bar, whale mural) and hide the 3 stock room rows (CHG-0033) | Development (on request) |
+| Photos on live (CHG-0031–0034) | New photos are on staging only. On the next live deploy also add the 7 gallery entries live lacks (CHG-0031 script: corridor, gym, bar, seating, seaside mural + alt texts; CHG-0032: neon bar, whale mural) and hide the 3 stock room rows (CHG-0033); repoint image URLs to `/assets/img/hotel/` (CHG-0034) | Development (on request) |
 | Fish-fry photo (CHG-0031/0032) | Supplied image has a "Vanitas Corner" watermark; confirm usage rights or send the hotel's own dish photo | Hotel |
 | Live: change the admin password | The live admin (admintycoon@proteam.co.in) has the same password as staging; change it on thetycoonshotel.com/admin | Hotel |
 | Live: test booking request | Send one booking request on the live site, check that both emails arrive (guest and reservations@), then decline it in the admin | Hotel |

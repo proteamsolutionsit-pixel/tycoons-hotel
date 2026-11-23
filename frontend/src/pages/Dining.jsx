@@ -21,7 +21,7 @@ export default function Dining() {
       <section className="section feature feature--rev" aria-labelledby="restaurant-title">
         <div className="wrap split">
           <div className="feature__media feature__media--parallax" data-clip="">
-            <img src="/assets/img/gal-restaurant.jpg" alt="Restaurant table setting" width="800" height="522" loading="lazy" data-parallax="" />
+            <img src="/assets/img/hotel/fishy-tales-restaurant.jpg" alt="Restaurant table setting" width="800" height="522" loading="lazy" data-parallax="" />
           </div>
           <div className="stack" data-reveal="">
             <p className="kicker">The Restaurant</p>

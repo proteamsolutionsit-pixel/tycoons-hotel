@@ -4,6 +4,8 @@ The schema is managed by Alembic only - nothing here creates or alters
 tables. Run `alembic upgrade head` as a deployment step."""
 from __future__ import annotations
 
+import re
+
 import asyncio
 import contextlib
 import logging
@@ -116,15 +118,30 @@ register_error_handlers(app)
 app.include_router(api_router)
 app.include_router(legacy_api_router)
 
+# Build files with a content hash in the name (index-DZINiWYW.js) never change: cache them for a year.
+# Everything else (images, index.html) must be re-checked with the server (cheap 304 via ETag), so a
+# replaced picture or a new release shows at once instead of after a browser's heuristic expiry.
+_HASHED = re.compile(r"-[A-Za-z0-9_-]{8}\.(?:js|css|woff2?)$")
+IMMUTABLE = "public, max-age=31536000, immutable"
+REVALIDATE = "no-cache"
+
+
+class CachedStaticFiles(StaticFiles):
+    def file_response(self, full_path, *args, **kwargs):
+        response = super().file_response(full_path, *args, **kwargs)
+        response.headers["Cache-Control"] = IMMUTABLE if _HASHED.search(str(full_path)) else REVALIDATE
+        return response
+
+
 # Admin-uploaded images. CVs live in storage/private and are never mounted.
-app.mount(settings.media_url_prefix, StaticFiles(directory=settings.storage_dir / "public", check_dir=False),
+app.mount(settings.media_url_prefix, CachedStaticFiles(directory=settings.storage_dir / "public", check_dir=False),
           name="media")
 
 # Optional: serve the built React app (history-API fallback to index.html).
 if settings.frontend_dist:
     dist = settings.frontend_dist.resolve()
     if (dist / "index.html").is_file():
-        app.mount("/assets", StaticFiles(directory=dist / "assets"), name="frontend-assets")
+        app.mount("/assets", CachedStaticFiles(directory=dist / "assets"), name="frontend-assets")
 
         @app.get("/{full_path:path}", include_in_schema=False)
         def spa(full_path: str):
@@ -132,5 +149,5 @@ if settings.frontend_dist:
                 raise StarletteHTTPException(status_code=404, detail="Not found")
             candidate = (dist / full_path).resolve()
             if full_path and dist in candidate.parents and candidate.is_file():
-                return FileResponse(candidate)
-            return FileResponse(dist / "index.html")
+                return FileResponse(candidate, headers={"Cache-Control": REVALIDATE})
+            return FileResponse(dist / "index.html", headers={"Cache-Control": REVALIDATE})

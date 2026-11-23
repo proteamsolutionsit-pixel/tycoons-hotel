@@ -8,7 +8,7 @@ import { SplitText } from '../SplitText';
 
 const SLIDES = [
   { src: '/assets/img/hero-city.jpg', alt: 'City skyline at dusk', w: 1920, h: 1280 },
-  { src: '/assets/img/room-premium.jpg', alt: '', w: 1920, h: 1254 },
+  { src: '/assets/img/hotel/premium-room.jpg', alt: '', w: 1920, h: 1254 },
   { src: '/assets/img/dining-dish.jpg', alt: '', w: 1200, h: 800 },
   { src: '/assets/img/spa.jpg', alt: '', w: 800, h: 546 },
 ];
